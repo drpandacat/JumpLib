@@ -719,7 +719,7 @@ function LOCAL_JUMPLIB.Init()
     ---@param damage integer | nil
     ---@return boolean
     function JumpLib:Pitfall(player, position, damage)
-        if player:IsCoopGhost() then return false end
+        if player.Type ~= EntityType.ENTITY_PLAYER or JumpLib:IsPitfalling(player) or player:IsCoopGhost() then return false end
         damage  = damage or 1
 
         player:PlayExtraAnimation("FallIn")
