@@ -49,7 +49,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 1.1
+    local LOCAL_VERSION = 1.2
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -362,6 +362,11 @@ function LOCAL_JUMPLIB.Init()
             Persistent = persistent
         })
     end
+
+    local function ClearScheduled()
+        JumpLib.Internal.SchedulerEntries = {}
+    end
+    AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, ClearScheduled)
 
     -- ---@param entity Entity
     -- local function ClearEntityDataOnRemove(_, entity)
