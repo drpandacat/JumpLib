@@ -1,7 +1,7 @@
 ---@diagnostic disable: undefined-global
 --[[
     Jump library by kerkel
-    Version 1.0
+    Version 1.0.3
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repo https://github.com/drpandacat/JumpLib/
 ]]
@@ -49,7 +49,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 1.2
+    local LOCAL_VERSION = 1.3
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -271,12 +271,10 @@ function LOCAL_JUMPLIB.Init()
         DISABLE_SHOOTING_INPUT = 1 << 17,
         ---Disables tears and projectiles being spawned at spawner height
         DISABLE_TEARHEIGHT = 1 << 18,
-        ---Will take explosion damage
-        DAMAGE_EXPLOSION = 1 << 19,
-        ---Will take laser damage
-        DAMAGE_LASER = 1 << 20,
         ---Entity will not collide with walls
-        GRIDCOLL_NO_WALLS = 1 << 21,
+        GRIDCOLL_NO_WALLS = 1 << 19,
+        ---Damage is not prevented while in the air
+        DAMAGE_CUSTOM = 1 << 20,
     }
 
     ---Combination of:
@@ -285,9 +283,8 @@ function LOCAL_JUMPLIB.Init()
     ---* `OVERWRITABLE`
     ---* `DISABLE_COOL_BOMBS`
     ---* `IGNORE_CONFIG_OVERRIDE`
-    ---* `DAMAGE_EXPLOSION`
     ---* `FAMILIAR_FOLLOW_ORBITALS_ONLY`
-    ---* `DAMAGE_LASER`
+    ---* `DAMAGE_CUSTOM`
     ---
     ---Useful for small, frequent jumps. Combine with desired familiar flag
     JumpLib.Flags.WALK_PRESET = JumpLib.Flags.COLLISION_GRID
@@ -295,8 +292,7 @@ function LOCAL_JUMPLIB.Init()
     | JumpLib.Flags.OVERWRITABLE
     | JumpLib.Flags.DISABLE_COOL_BOMBS
     | JumpLib.Flags.IGNORE_CONFIG_OVERRIDE
-    | JumpLib.Flags.DAMAGE_EXPLOSION
-    | JumpLib.Flags.DAMAGE_LASER
+    | JumpLib.Flags.DAMAGE_CUSTOM
 
     JumpLib.Constants = {
         PITFRAME_START = 15,
@@ -333,11 +329,6 @@ function LOCAL_JUMPLIB.Init()
         },
 
         SchedulerEntries = {},
-
-        EffectVariant = {
-            LILY_PAD = Isaac.GetEntityVariantByName("Lily Pad"),
-            FIRE_GUNPOWER = Isaac.GetEntityVariantByName("Fire (Gunpowder)")
-        }
     }
 
     ---@param callback ModCallbacks | JumpCallback
@@ -1110,25 +1101,13 @@ function LOCAL_JUMPLIB.Init()
     ---@param entity Entity
     ---@param flags DamageFlag
     ---@param source EntityRef
-    local function PreventExplosionDamage(_, entity, _, flags, source)
+    local function PreventDamage(_, entity, _, flags, source)
+        if flags & DamageFlag.DAMAGE_RED_HEARTS ~= 0 then return end
         local data = JumpLib:GetData(entity) if not data.Jumping then return end
-        local explosionFlags = data.Flags & JumpLib.Flags.DAMAGE_EXPLOSION == 0 
-        local explosion = (explosionFlags and flags & DamageFlag.DAMAGE_EXPLOSION ~= 0)
-        local laser = (data.Flags & JumpLib.Flags.DAMAGE_LASER == 0 and flags & DamageFlag.DAMAGE_LASER ~= 0)
-        local fire = FiendFolio and source.Type == EntityType.ENTITY_EFFECT and source.Variant == JumpLib.Internal.EffectVariant.FIRE_GUNPOWER
-
-        if fire then
-            if explosionFlags then
-                return false
-            end
-            return
-        end
-
-        if explosion or laser then
-            return false
-        end
+        if data.Flags & JumpLib.Flags.DAMAGE_CUSTOM ~= 0 then return end
+        return false
     end
-    AddCallback(ModCallbacks.MC_ENTITY_TAKE_DMG, PreventExplosionDamage)
+    AddCallback(ModCallbacks.MC_ENTITY_TAKE_DMG, PreventDamage)
 
     ---wip
     ---@param tear EntityTear | EntityProjectile
