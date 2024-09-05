@@ -17,4 +17,4 @@ Download the library and include or require it inside of your mod, and call the 
 ```lua
 require("scripts.lib.jumplib").Init()
 ```
-You are now able to access anything from the `JumpLib` global
+You are now able to access anything from the `JumpLib` global!
