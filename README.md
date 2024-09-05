@@ -1,5 +1,5 @@
 # Jump Library (1.1)
-JumpLib is a library for TBOI Repentance modding that allows for easy and customizable functionality around moving the entities through the air, avoiding mod conflicts when used across multiple mods
+JumpLib is a library for Isaac Repentance mods that allows for easy and customizable functionality around moving the entities through the air, avoiding mod conflicts when used across multiple mods
 ### Features
 - 12 functions (including `GetData`, `Jump`, `SetHeight`, `IsFalling`, + more)
 - 21 callbacks with various return types and optional parameters
