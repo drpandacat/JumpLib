@@ -1,10 +1,11 @@
----@diagnostic disable: undefined-global
 --[[
-    Jump library by kerkel
-    Version 1.0.3
+    Jump library by Kerkel
+    Version 1.1
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
-    GitHub repo https://github.com/drpandacat/JumpLib/
+    GitHub repository: https://github.com/drpandacat/JumpLib/
 ]]
+
+---@diagnostic disable: undefined-global
 
 ---@class JumpData
 ---@field Jumping boolean
@@ -49,7 +50,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 1.3
+    local LOCAL_VERSION = 2 -- 1.1
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -57,8 +58,6 @@ function LOCAL_JUMPLIB.Init()
         end
         JumpLib.Internal:RemoveCallbacks()
     end
-
-    local game = Game()
 
     JumpLib = RegisterMod("JumpLib", 1)
     JumpLib.Version = LOCAL_VERSION
@@ -230,6 +229,24 @@ function LOCAL_JUMPLIB.Init()
         ---* entity - `Entity`
         ---* data - `JumpData`
         ENTITY_UPDATE_60 = "JUMPLIB_ENTITY_UPDATE_60",
+        ---Runs 60 times per second for every entity in the air, before `ENTITY_UPDATE_60`
+        ---
+        ---Parameters:
+        ---* entity - `Entity`
+        ---* data - `JumpData`
+        ---
+        ---Returns:
+        ---* Return `true` to cancel the update
+        PRE_ENTITY_UPDATE = "JUMPLIB_PRE_ENTITY_UPDATE",
+        ---Runs 60 times per second for every player in the air, before `PLAYER_UPDATE_60`
+        ---
+        ---Parameters:
+        ---* players - `EntityPlayer`
+        ---* data - `JumpData`
+        ---
+        ---Returns:
+        ---* Return `true` to cancel the update
+        PRE_PLAYER_UPDATE = "JUMPLIB_PRE_PLAYER_UPDATE",
     }
 
     JumpLib.Flags = {
@@ -255,26 +272,36 @@ function LOCAL_JUMPLIB.Init()
         IGNORE_CONFIG_OVERRIDE = 1 << 9,
         ---Lasers will not follow parent
         DISABLE_LASER_FOLLOW = 1 << 10,
-        ---Only orbital familiars will follow the player
-        FAMILIAR_FOLLOW_ORBITALS_ONLY =  1 << 11,
-        ---Only tear-copying familiars will follow the player
-        FAMILIAR_FOLLOW_TEARCOPYING_ONLY = 1 << 12,
-        ---Familiars will not use default jumping behaviors when following player
-        FAMILIAR_FOLLOW_CUSTOM = 1 << 13,
+        ---Orbitals will follow the player while jumping
+        FAMILIAR_FOLLOW_ORBITALS =  1 << 11,
+        ---Tear-copying familiars will follow the player while jumping
+        FAMILIAR_FOLLOW_TEARCOPYING = 1 << 12,
         ---Lasers will not use default jumping behaviors
-        LASER_FOLLOW_CUSTOM = 1 << 14,
+        LASER_FOLLOW_CUSTOM = 1 << 13,
         ---Bombs drop as if you were not jumping
-        DISABLE_COOL_BOMBS = 1 << 15,
+        DISABLE_COOL_BOMBS = 1 << 14,
         ---Bombs are unable to be dropped
-        DISABLE_BOMB_INPUT = 1 << 16,
+        DISABLE_BOMB_INPUT = 1 << 15,
         ---Player is unable to shoot
-        DISABLE_SHOOTING_INPUT = 1 << 17,
+        DISABLE_SHOOTING_INPUT = 1 << 16,
         ---Disables tears and projectiles being spawned at spawner height
-        DISABLE_TEARHEIGHT = 1 << 18,
+        DISABLE_TEARHEIGHT = 1 << 17,
         ---Entity will not collide with walls
-        GRIDCOLL_NO_WALLS = 1 << 19,
+        GRIDCOLL_NO_WALLS = 1 << 18,
         ---Damage is not prevented while in the air
-        DAMAGE_CUSTOM = 1 << 20,
+        DAMAGE_CUSTOM = 1 << 19,
+        ---Following familiars will follow the player while jumping
+        FAMILIAR_FOLLOW_FOLLOWERS = 1 << 20,
+
+        ---Use `FAMILIAR_FOLLOW_ORBITALS`
+        ---@deprecated
+        FAMILIAR_FOLLOW_ORBITALS_ONLY =  1 << 11,
+        ---Use `FAMILIAR_FOLLOW_TEARCOPYING`
+        ---@deprecated
+        FAMILIAR_FOLLOW_TEARCOPYING_ONLY = 1 << 12,
+        ---Familiars no longer follow the player by default
+        ---@deprecated
+        FAMILIAR_FOLLOW_CUSTOM = 1 << 13,
     }
 
     ---Combination of:
@@ -283,8 +310,8 @@ function LOCAL_JUMPLIB.Init()
     ---* `OVERWRITABLE`
     ---* `DISABLE_COOL_BOMBS`
     ---* `IGNORE_CONFIG_OVERRIDE`
-    ---* `FAMILIAR_FOLLOW_ORBITALS_ONLY`
     ---* `DAMAGE_CUSTOM`
+    ---`FAMILIAR_FOLLOW_ORBITALS`
     ---
     ---Useful for small, frequent jumps. Combine with desired familiar flag
     JumpLib.Flags.WALK_PRESET = JumpLib.Flags.COLLISION_GRID
@@ -293,6 +320,7 @@ function LOCAL_JUMPLIB.Init()
     | JumpLib.Flags.DISABLE_COOL_BOMBS
     | JumpLib.Flags.IGNORE_CONFIG_OVERRIDE
     | JumpLib.Flags.DAMAGE_CUSTOM
+    | JumpLib.Flags.FAMILIAR_FOLLOW_ORBITALS
 
     JumpLib.Constants = {
         PITFRAME_START = 15,
@@ -302,10 +330,10 @@ function LOCAL_JUMPLIB.Init()
         CONFIG_HEIGHT_MULT = 2,
         CONFIG_SPEED_MULT = 0.2,
         FALLSPEED_INCR = 0.2,
+        TEAR_HEIGHT_MULT = 3.95
     }
 
     JumpLib.Internal = {
-        EntityData = {},
         CallbackEntries = {},
 
         TEAR_COPYING_FAMILIARS = {
@@ -329,51 +357,137 @@ function LOCAL_JUMPLIB.Init()
         },
 
         SchedulerEntries = {},
+
+        Vector = {
+            Zero = Vector(0, 0),
+            One = Vector(1, 1)
+        },
+
+        ---@param familiar EntityFamiliar
+        ---@return boolean
+        IsOrbital = function (self, familiar)
+            return familiar.OrbitDistance:Length() > 0.001
+        end,
+
+        ---@param familiar EntityFamiliar
+        ---@return boolean
+        IsFollower = function (self, familiar)
+            if not familiar.IsFollower then return false end
+            local king
+            if familiar.Player:GetAimDirection():Length() > 0.001 then
+                for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_FAMILIAR)) do
+                    local _v = v:ToFamiliar() ---@cast _v EntityFamiliar
+                    if GetPtrHash(_v.Player) == GetPtrHash(familiar.Player) then
+                        king = true
+                        break
+                    end
+                end
+            end
+            if king then return false end
+            return familiar.IsFollower
+        end,
+
+        ---@param fn function
+        ---@param delay integer
+        ---@param persistent boolean | nil
+        ScheduleFunction = function (self, fn, delay, persistent)
+            table.insert(JumpLib.Internal.SchedulerEntries, {
+                Frame = Game():GetFrameCount(),
+                Function = fn,
+                Delay = delay,
+                Persistent = persistent
+            })
+        end,
+
+        ---@param entity Entity
+        ---@return InternalJumpData
+        GetData = function (self, entity)
+            local data = entity:GetData()
+            data.__JUMPLIB = data.__JUMPLIB or {}
+            return data.__JUMPLIB
+        end,
+
+        RemoveCallbacks = function ()
+            for _, v in ipairs(JumpLib.Internal.CallbackEntries) do
+                JumpLib:RemoveCallback(v.Callback, v.Function)
+            end
+        end,
+
+        ---@param entity Entity
+        LaserBehaviorsFromEntity = function (self, entity)
+            local entityData = JumpLib.Internal:GetData(entity)
+            local hash = GetPtrHash(entity)
+            local player = entity:ToPlayer()
+
+            for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_LASER)) do
+                if v.SpawnerEntity and GetPtrHash(v.SpawnerEntity) == hash or v.Parent and GetPtrHash(v.Parent) == hash then
+                    local laser = v:ToLaser() ---@cast laser EntityLaser
+
+                    if JumpLib:GetData(entity).Flags & JumpLib.Flags.DISABLE_LASER_FOLLOW == 0 then
+                        local returns = {}
+
+                        if player then
+                            returns = JumpLib:RunCallbackWithParam(JumpLib.Callbacks.GET_LASER_CAN_FOLLOW_PLAYER, player, laser)
+                        end
+
+                        for _, _v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.GET_LASER_CAN_FOLLOW_ENTITY, entity, laser)) do
+                            table.insert(returns, _v)
+                        end
+
+                        local follow
+
+                        for _, _v in ipairs(returns) do
+                            if _v == true then
+                                follow = true
+                            elseif _v == false then
+                                follow = false
+                            end
+                        end
+
+                        if follow and JumpLib:GetData(entity).Flags & JumpLib.Flags.LASER_FOLLOW_CUSTOM == 0 then
+                            local laserData = JumpLib.Internal:GetData(laser)
+
+                            if not (laser.DisableFollowParent or (laser:IsCircleLaser())) or not laserData.SetInitialLaserHeight then
+                                local config = entityData.Config; config.Speed = 0
+
+                                if laser:IsCircleLaser() then
+                                    JumpLib:SetHeight(laser, entityData.Height, {Height = 0, Speed = 0.8})
+                                else
+                                    JumpLib:SetHeight(laser, entityData.Height, config)
+
+                                    laserData.StaticHeightIncrease = 0
+                                    laserData.StaticJumpSpeed = 0
+                                end
+
+                                laserData.SetInitialLaserHeight = true
+                            end
+                        end
+
+                        laser.PositionOffset = JumpLib:GetOffset(laser)
+                    end
+                end
+            end
+        end
     }
 
     ---@param callback ModCallbacks | JumpCallback
     ---@param fn function
     ---@param param any
     local function AddCallback(callback, fn, param)
-        JumpLib.Internal.CallbackEntries[#JumpLib.Internal.CallbackEntries + 1] = {
+        table.insert(JumpLib.Internal.CallbackEntries, {
             Callback = callback,
             Function = fn,
             Param = param,
-        }
-    end
-
-    ---@param fn function
-    ---@param delay integer
-    ---@param persistent boolean | nil
-    function JumpLib.Internal:ScheduleFunction(fn, delay, persistent)
-        table.insert(JumpLib.Internal.SchedulerEntries, {
-            Frame = game:GetFrameCount(),
-            Function = fn,
-            Delay = delay,
-            Persistent = persistent
         })
     end
 
-    local function ClearScheduled()
+
+    AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, function ()
         JumpLib.Internal.SchedulerEntries = {}
-    end
-    AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, ClearScheduled)
+    end)
 
-    -- ---@param entity Entity
-    -- local function ClearEntityDataOnRemove(_, entity)
-    --     JumpLib.Internal:ScheduleFunction(function ()
-    --         JumpLib.Internal.EntityData[GetPtrHash(entity)] = nil
-    --     end, 1, true)
-    -- end
-    -- AddCallback(ModCallbacks.MC_POST_ENTITY_REMOVE, ClearEntityDataOnRemove)
-
-    -- local function ClearDataOnExit()
-    --     JumpLib.Internal.EntityData = {}
-    -- end
-    -- AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, ClearDataOnExit)
-
-    local function Scheduler()
-        local frame = game:GetFrameCount()
+    AddCallback(ModCallbacks.MC_POST_UPDATE, function ()
+        local frame = Game():GetFrameCount()
 
         for i = #JumpLib.Internal.SchedulerEntries, 1, -1 do
             local v = JumpLib.Internal.SchedulerEntries[i]
@@ -382,96 +496,15 @@ function LOCAL_JUMPLIB.Init()
                 table.remove(JumpLib.Internal.SchedulerEntries, i)
             end
         end
-    end
-    AddCallback(ModCallbacks.MC_POST_UPDATE, Scheduler)
+    end)
 
-    local function RemoveNonPersistentFunctions()
+    AddCallback(ModCallbacks.MC_POST_NEW_ROOM, function ()
         for i, v in ipairs(JumpLib.Internal.SchedulerEntries) do
             if not v.Persistent then
                 table.remove(JumpLib.Internal.SchedulerEntries, i)
             end
         end
-    end
-    AddCallback(ModCallbacks.MC_POST_NEW_ROOM, RemoveNonPersistentFunctions)
-
-    ---@param entity Entity
-    ---@return InternalJumpData
-    function JumpLib.Internal:GetData(entity)
-        -- local hash = GetPtrHash(entity)
-
-        -- if not JumpLib.Internal.EntityData[hash] then
-        --     JumpLib.Internal.EntityData[hash] = {}
-        -- end
-
-        -- return JumpLib.Internal.EntityData[hash]
-
-        local data = entity:GetData()
-        data.__JUMPLIB = data.__JUMPLIB or {}
-        return data.__JUMPLIB
-    end
-
-    ---@param entity Entity
-    function JumpLib.Internal:LaserBehaviorsFromEntity(entity)
-        local entityData = JumpLib.Internal:GetData(entity)
-        local hash = GetPtrHash(entity)
-        local player = entity:ToPlayer()
-
-        for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_LASER)) do
-            if v.SpawnerEntity and GetPtrHash(v.SpawnerEntity) == hash
-            or v.Parent and GetPtrHash(v.Parent) == hash then
-                local laser = v:ToLaser() ---@cast laser EntityLaser
-
-                if JumpLib:GetData(entity).Flags & JumpLib.Flags.DISABLE_LASER_FOLLOW == 0 then
-                    local returns = {}
-
-                    if player then
-                        returns = JumpLib:RunCallbackWithParam(JumpLib.Callbacks.GET_LASER_CAN_FOLLOW_PLAYER, player, laser)
-                    end
-
-                    for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.GET_LASER_CAN_FOLLOW_ENTITY, entity, laser)) do
-                        returns[#returns + 1] = v
-                    end
-
-                    local follow
-
-                    for _, v in ipairs(returns) do
-                        if v == true then
-                            follow = true
-                        elseif v == false then
-                            follow = false
-                        end
-                    end
-
-                    if follow and JumpLib:GetData(entity).Flags & JumpLib.Flags.LASER_FOLLOW_CUSTOM == 0 then
-                        local laserData = JumpLib.Internal:GetData(laser)
-
-                        if not (laser.DisableFollowParent or (laser:IsCircleLaser())) or not laserData.SetInitialLaserHeight then
-                            local config = entityData.Config; config.Speed = 0
-
-                            if laser:IsCircleLaser() then
-                                JumpLib:SetHeight(laser, entityData.Height, {Height = 0, Speed = 0.8})
-                            else
-                                JumpLib:SetHeight(laser, entityData.Height, config)
-
-                                laserData.StaticHeightIncrease = 0
-                                laserData.StaticJumpSpeed = 0
-                            end
-
-                            laserData.SetInitialLaserHeight = true
-                        end
-                    end
-
-                    laser.PositionOffset = JumpLib:GetOffset(laser)
-                end
-            end
-        end
-    end
-
-    function JumpLib.Internal:RemoveCallbacks()
-        for _, v in ipairs(JumpLib.Internal.CallbackEntries) do
-            JumpLib:RemoveCallback(v.Callback, v.Function)
-        end
-    end
+    end)
 
     ---@param callback JumpCallback | string
     ---@param entity Entity
@@ -515,16 +548,12 @@ function LOCAL_JUMPLIB.Init()
                 end
             end
 
-            if isType
-            and isVariant
-            and isSubType
-            and hasCollectible
-            and hasTrinket
-            and hasEffect
-            and hasTag
-            and isPlayer
-            and hasWeapon then
-                returns[#returns + 1] = v.Function(v.Mod, entity, ...)
+            if isType and isVariant and isSubType and hasCollectible and hasTrinket and hasEffect and hasTag and isPlayer and hasWeapon then
+                local _return = v.Function(v.Mod, entity, ...)
+
+                if _return then
+                    table.insert(returns, _return)
+                end
             end
         end
 
@@ -564,7 +593,7 @@ function LOCAL_JUMPLIB.Init()
 
         if player then
             for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_PLAYER_JUMP, player, config)) do
-                returns[#returns + 1] = v
+                table.insert(returns, v)
             end
         end
 
@@ -613,15 +642,17 @@ function LOCAL_JUMPLIB.Init()
                 data.GridCollToSet = data.Flags & JumpLib.Flags.GRIDCOLL_NO_WALLS == 0 and EntityGridCollisionClass.GRIDCOLL_WALLS or EntityGridCollisionClass.GRIDCOLL_NONE
             end
 
-            for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_KNIFE)) do
-                if GetPtrHash(v.Parent) == hash and data.Flags & JumpLib.Flags.KNIFE_FOLLOW_CUSTOM == 0 then
-                    local konfig = config; konfig.Flags = (konfig.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS) ~ JumpLib.Flags.COLLISION_GRID
+            if data.Flags & JumpLib.Flags.KNIFE_FOLLOW_CUSTOM == 0 then
+                for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_KNIFE)) do
+                    if v.Parent and GetPtrHash(v.Parent) == hash then
+                        local konfig = config; konfig.Flags = (konfig.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS) ~ JumpLib.Flags.COLLISION_GRID
 
-                    if data.Flags & JumpLib.Flags.KNIFE_DISABLE_ENTCOLL ~= 0 then
-                        konfig.Flags = konfig.Flags | JumpLib.Flags.COLLISION_ENTITY
+                        if data.Flags & JumpLib.Flags.KNIFE_DISABLE_ENTCOLL ~= 0 then
+                            konfig.Flags = konfig.Flags | JumpLib.Flags.COLLISION_ENTITY
+                        end
+
+                        JumpLib:Jump(v, konfig)
                     end
-
-                    JumpLib:Jump(v, konfig)
                 end
             end
         end
@@ -631,22 +662,38 @@ function LOCAL_JUMPLIB.Init()
         if player then
             JumpLib:RunCallbackWithParam(JumpLib.Callbacks.POST_PLAYER_JUMP, entity, config)
 
-            if data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_CUSTOM == 0 then
-                for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_FAMILIAR)) do
-                    local familiar = v:ToFamiliar() ---@cast familiar EntityFamiliar
-                    if familiar.Player and GetPtrHash(familiar.Player) == hash then
-                        local orbital = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_ORBITALS_ONLY ~= 0
-                        local tearCopying = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_TEARCOPYING_ONLY ~= 0
-                        local isOrbital = familiar.OrbitLayer ~= -1
-                        local isTearCopying = JumpLib.Internal.TEAR_COPYING_FAMILIARS[v.Variant]
+            local orbitals = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_ORBITALS ~= 0
+            local followers = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_FOLLOWERS ~= 0
+            local tearcopying = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_TEARCOPYING ~= 0
 
-                        if (orbital and isOrbital) or (tearCopying and isTearCopying) or not (orbital or tearCopying) then
-                            local config2 = config; if isOrbital then config2.Flags = config2.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS end
-                            JumpLib:Jump(v, config2)
-                        end
-                    end
+            for i, v in ipairs(Isaac.FindByType(EntityType.ENTITY_FAMILIAR)) do
+                local familiar = v:ToFamiliar() ---@cast familiar EntityFamiliar
+                local orbital = (orbitals and JumpLib.Internal:IsOrbital(familiar))
+
+                if orbital or (followers and JumpLib.Internal:IsFollower(familiar)) or (tearcopying and JumpLib.Internal.TEAR_COPYING_FAMILIARS[familiar.Variant]) then
+                    local _config = config; if orbital then _config.Flags = _config.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS end
+                    JumpLib:Jump(v, _config)
                 end
+                -- local name = EntityConfig.GetEntity(EntityType.ENTITY_FAMILIAR, familiar.Variant, familiar.SubType):GetName()
+                -- print(name .. ", " .. i)
+                -- print("    Is Follower?", familiar.IsFollower)
+                -- print("    Orbit distance:", familiar.OrbitDistance)
+                -- data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_ORBITALS_ONLY
             end
+                -- for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_FAMILIAR)) do
+                --     local familiar = v:ToFamiliar() ---@cast familiar EntityFamiliar
+                --     if familiar.Player and GetPtrHash(familiar.Player) == hash then
+                --         local orbital = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_ORBITALS_ONLY ~= 0
+                --         local tearCopying = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_TEARCOPYING_ONLY ~= 0
+                --         local isOrbital = familiar.OrbitLayer ~= -1
+                --         local isTearCopying = JumpLib.Internal.TEAR_COPYING_FAMILIARS[v.Variant]
+
+                --         if (orbital and isOrbital) or (tearCopying and isTearCopying) or not (orbital or tearCopying) then
+                --             local config2 = config; if isOrbital then config2.Flags = config2.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS end
+                --             JumpLib:Jump(v, config2)
+                --         end
+                --     end
+                -- end
         end
 
         return true
@@ -696,7 +743,6 @@ function LOCAL_JUMPLIB.Init()
         entityData.Flags = 0
         entityData.Fallspeed = 0
 
-        ---@diagnostic disable-next-line: param-type-mismatch
         if not JumpLib:IsPitfalling(entity) then
             entityData.StoredEntityColl = nil
             entityData.StoredGridColl = nil
@@ -741,10 +787,10 @@ function LOCAL_JUMPLIB.Init()
 
         JumpLib.Internal:ScheduleFunction(function ()
             player:AnimatePitfallOut()
-            player.SpriteScale = data.StoredSpriteScale
+            player.SpriteScale = data.StoredSpriteScale or JumpLib.Internal.Vector.One
 
             data.StoredSpriteScale = nil
-            data.PitPos = game:GetRoom():FindFreePickupSpawnPosition(player.Position, 40)
+            data.PitPos = Game():GetRoom():FindFreePickupSpawnPosition(player.Position, 40)
         end, JumpLib.Constants.PITFRAME_DAMAGE, true)
 
         JumpLib.Internal:ScheduleFunction(function ()
@@ -765,7 +811,7 @@ function LOCAL_JUMPLIB.Init()
     end
 
     ---Returns if player is currently pitfalling
-    ---@param player EntityPlayer
+    ---@param player Entity
     ---@return boolean
     function JumpLib:IsPitfalling(player)
         return not not JumpLib.Internal:GetData(player).Pitfall
@@ -841,7 +887,7 @@ function LOCAL_JUMPLIB.Init()
             end
 
             for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_SET_FALLSPEED, entity, speed, JumpLib:GetData(entity))) do
-                returns[#returns + 1] = v
+                table.insert(returns, v)
             end
 
             for _, v in ipairs(returns) do
@@ -864,6 +910,10 @@ function LOCAL_JUMPLIB.Init()
         return true
     end
 
+    ---Returns a render offset for non-laser entites that is automatically adjusted for reflections
+    ---
+    ---
+    ---Returns a position offset for laser entities
     ---@param entity Entity
     ---@param yOffset number | nil
     ---@return Vector
@@ -887,20 +937,29 @@ function LOCAL_JUMPLIB.Init()
         end
 
         if not data.Jumping then
-            return Vector.Zero
+            return JumpLib.Internal.Vector.Zero
         end
 
         local renderOffset = Vector(0, -data.Height + (yOffset or 0))
 
-        if game:GetRoom():GetRenderMode() == RenderMode.RENDER_WATER_REFLECT then
+        if Game():GetRoom():GetRenderMode() == RenderMode.RENDER_WATER_REFLECT then
             renderOffset = -renderOffset
         end
 
         return renderOffset
     end
 
-    local function RunUpdate()
-        if game:IsPaused() then return end
+    ---@param entity Entity
+    function JumpLib:IsFalling(entity)
+        local data = JumpLib.Internal:GetData(entity)
+        if (data.Fallspeed or 0) > (data.StaticHeightIncrease or 1) then
+            return true
+        end
+        return false
+    end
+
+    AddCallback(ModCallbacks.MC_POST_RENDER, function ()
+        if Game():IsPaused() then return end
 
         for _, entity in ipairs(Isaac.GetRoomEntities()) do
             local entityData = JumpLib.Internal:GetData(entity)
@@ -910,9 +969,21 @@ function LOCAL_JUMPLIB.Init()
             entityData.UpdateFrame = (entityData.UpdateFrame or 1) + 1
 
             if jumpData.Jumping then
+                for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_UPDATE, entity, jumpData)) do
+                    if v == true then
+                        return
+                    end
+                end
+
                 JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_UPDATE_60, entity, jumpData)
 
                 if player then
+                    for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_PLAYER_UPDATE, player, jumpData)) do
+                        if v == true then
+                            return
+                        end
+                    end
+
                     JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PLAYER_UPDATE_60, player, jumpData)
                 end
 
@@ -925,12 +996,11 @@ function LOCAL_JUMPLIB.Init()
                 end
             end
         end
-    end
-    AddCallback(ModCallbacks.MC_POST_RENDER, RunUpdate)
+    end)
 
     ---@param entity Entity
     ---@param jumpData JumpData
-    local function OnUpdate(_, entity, jumpData)
+    AddCallback(JumpLib.Callbacks.ENTITY_UPDATE_60, function (_, entity, jumpData)
         local entityData = JumpLib.Internal:GetData(entity)
         local player = entity:ToPlayer()
 
@@ -957,7 +1027,7 @@ function LOCAL_JUMPLIB.Init()
                     if jumpData.Flags & JumpLib.Flags.COLLISION_GRID == 0 then
 
                         local pitFound
-                        local room = game:GetRoom()
+                        local room = Game():GetRoom()
 
                         local grid = room:GetGridEntityFromPos(player.Position)
                         local pit
@@ -1015,11 +1085,11 @@ function LOCAL_JUMPLIB.Init()
 
             entityData.PrevTags = nil
         end
-    end
-    AddCallback(JumpLib.Callbacks.ENTITY_UPDATE_60, OnUpdate)
+    end)
 
+    ---Pitfall
     ---@param player EntityPlayer
-    local function PitfallVelocity(_, player)
+    AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, function (_, player)
         local data = JumpLib.Internal:GetData(player) if not data.Pitfall then return end
 
         player.ControlsEnabled = false
@@ -1029,16 +1099,16 @@ function LOCAL_JUMPLIB.Init()
 
         player.Velocity = (data.PitPos - player.Position) * 0.1
 
-        if player:GetSprite():IsFinished("FallIn") and player.SpriteScale ~= Vector.Zero then
+        if player:GetSprite():IsFinished("FallIn") and player.SpriteScale ~= JumpLib.Internal.Vector.Zero then
             data.StoredSpriteScale = player.SpriteScale
-            player.SpriteScale = Vector.Zero
+            player.SpriteScale = JumpLib.Internal.Vector.Zero
         end
-    end
-    AddCallback(ModCallbacks.MC_POST_PEFFECT_UPDATE, PitfallVelocity)
+    end)
 
     ---@param laser EntityLaser
-    local function LaserUpdate(_, laser)
+    AddCallback(ModCallbacks.MC_PRE_LASER_UPDATE, function (_, laser)
         if laser.Variant == LaserVariant.TRACTOR_BEAM then return end
+
         local spawner = laser.SpawnerEntity or laser.Parent
 
         if spawner and JumpLib:GetData(spawner).Jumping then
@@ -1048,8 +1118,7 @@ function LOCAL_JUMPLIB.Init()
         if not JumpLib:GetData(laser) then return end
 
         laser.PositionOffset = JumpLib:GetOffset(laser)
-    end
-    AddCallback(ModCallbacks.MC_PRE_LASER_UPDATE, LaserUpdate)
+    end)
 
     ---@param entity Entity
     local function PreRender(_, entity)
@@ -1060,79 +1129,80 @@ function LOCAL_JUMPLIB.Init()
         end
     end
 
-    -- ModCallbacks.MC_PRE_EFFECT_RENDER
-    -- ModCallbacks.MC_PRE_FAMILIAR_RENDER
-    -- ModCallbacks.MC_PRE_KNIFE_RENDER
-    -- ModCallbacks.MC_PRE_NPC_RENDER
-    -- ModCallbacks.MC_PRE_PICKUP_RENDER
-    -- ModCallbacks.MC_PRE_PLAYER_RENDER
-    -- ModCallbacks.MC_PRE_PROJECTILE_RENDER
-    -- ModCallbacks.MC_PRE_TEAR_RENDER
-    for i = ModCallbacks.MC_PRE_FAMILIAR_RENDER, ModCallbacks.MC_PRE_BOMB_RENDER do
-        AddCallback(i, PreRender)
+    for _, v in ipairs({
+        ModCallbacks.MC_PRE_EFFECT_RENDER,
+        ModCallbacks.MC_PRE_FAMILIAR_RENDER,
+        ModCallbacks.MC_PRE_KNIFE_RENDER,
+        ModCallbacks.MC_PRE_NPC_RENDER,
+        ModCallbacks.MC_PRE_PICKUP_RENDER,
+        ModCallbacks.MC_PRE_PLAYER_RENDER,
+        ModCallbacks.MC_PRE_PROJECTILE_RENDER,
+        ModCallbacks.MC_PRE_TEAR_RENDER,
+        ModCallbacks.MC_PRE_SLOT_RENDER,
+    }) do
+        AddCallback(v, PreRender)
     end
 
     ---@param bomb EntityBomb
-    local function OnBombDrop(_, bomb)
-        local spawner = bomb.SpawnerEntity if not spawner then return end
-        local data = JumpLib:GetData(spawner) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_COOL_BOMBS ~= 0 then return end
+    AddCallback(ModCallbacks.MC_POST_BOMB_INIT, function (_, bomb)
+        if bomb.SpawnerType ~= EntityType.ENTITY_PLAYER then return end
+        local data = JumpLib:GetData(bomb.SpawnerEntity) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_COOL_BOMBS ~= 0 then return end
 
         JumpLib:SetHeight(bomb, data.Height, {
             Height = 0,
             Speed = 1.25,
             Tags = "JUMPLIB_BOMB"
         })
-    end
-    AddCallback(ModCallbacks.MC_POST_BOMB_INIT, OnBombDrop)
+    end)
 
     ---@param entity Entity
-    local function BombLand(_, entity)
+    AddCallback(JumpLib.Callbacks.ENTITY_LAND, function (_, entity)
         local bomb = entity:ToBomb() ---@cast bomb EntityBomb
+
         if bomb.IsFetus then return end
 
         bomb:SetExplosionCountdown(0)
-        -- bomb:Update()
-    end
-    AddCallback(JumpLib.Callbacks.ENTITY_LAND, BombLand, {
+    end, {
         type = EntityType.ENTITY_BOMB,
         tag = "JUMPLIB_BOMB"
     })
 
     ---@param entity Entity
     ---@param flags DamageFlag
-    ---@param source EntityRef
-    local function PreventDamage(_, entity, _, flags, source)
+    AddCallback(ModCallbacks.MC_ENTITY_TAKE_DMG, function (_, entity, _, flags)
         if flags & DamageFlag.DAMAGE_RED_HEARTS ~= 0 then return end
         local data = JumpLib:GetData(entity) if not data.Jumping then return end
         if data.Flags & JumpLib.Flags.DAMAGE_CUSTOM ~= 0 then return end
         return false
-    end
-    AddCallback(ModCallbacks.MC_ENTITY_TAKE_DMG, PreventDamage)
+    end)
 
-    ---wip
+    ---WIP
     ---@param tear EntityTear | EntityProjectile
     local function TearInit(_, tear)
         if tear.FrameCount ~= 0 then return end
         local spawner = tear.SpawnerEntity or tear.Parent if not spawner then return end
         local data = JumpLib:GetData(spawner) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_TEARHEIGHT ~= 0 then return end
 
-        tear.Height = tear.Height - data.Height * 3.33
+        tear.Height = tear.Height - data.Height * JumpLib.Constants.TEAR_HEIGHT_MULT
     end
-    AddCallback(ModCallbacks.MC_POST_TEAR_UPDATE, TearInit)
-    AddCallback(ModCallbacks.MC_POST_PROJECTILE_UPDATE, TearInit)
 
-    ---@param entity Entity
-    local function EnableLaserFollow(_, entity)
+    for _, v in ipairs({
+        ModCallbacks.MC_POST_TEAR_UPDATE,
+        ModCallbacks.MC_POST_PROJECTILE_UPDATE,
+    }) do
+        AddCallback(v, TearInit)
+    end
+
+    AddCallback(JumpLib.Callbacks.GET_LASER_CAN_FOLLOW_ENTITY, function (_)
         if JumpLib:GetData(entity).Flags & JumpLib.Flags.LASER_FOLLOW_CUSTOM == 0 then
             return true
         end
-    end
-    AddCallback(JumpLib.Callbacks.GET_LASER_CAN_FOLLOW_ENTITY, EnableLaserFollow)
+    end)
 
     ---@param entity Entity
     ---@param hook InputHook
     ---@param action ButtonAction
-    local function InputAction(_, entity, hook, action)
+    AddCallback(ModCallbacks.MC_INPUT_ACTION, function (_, entity, hook, action)
         local player = entity and entity:ToPlayer() if not player then return end
         local data = JumpLib:GetData(player) if not data.Jumping then return end
 
@@ -1145,28 +1215,25 @@ function LOCAL_JUMPLIB.Init()
                 return JumpLib.Internal.HOOK_TO_CANCEL[hook]
             end
         end
-    end
-    AddCallback(ModCallbacks.MC_INPUT_ACTION, InputAction)
+    end)
 
     ---@param grid GridEntityPressurePlate
-    local function ButtonUpdate(_, grid)
+    AddCallback(ModCallbacks.MC_PRE_GRID_ENTITY_PRESSUREPLATE_UPDATE, function (_, grid)
         for _, v in ipairs(Isaac.FindInRadius(grid.Position, 80, EntityPartition.PLAYER)) do
             local data = JumpLib:GetData(v) if data.Jumping and data.Flags & JumpLib.Flags.COLLISION_GRID == 0 then
                 return true
             end
         end
-    end
-    AddCallback(ModCallbacks.MC_PRE_GRID_ENTITY_PRESSUREPLATE_UPDATE, ButtonUpdate)
+    end)
 
     ---@param grid GridEntity
-    local function LockUpdate(_, grid)
+    AddCallback(ModCallbacks.MC_PRE_GRID_ENTITY_LOCK_UPDATE, function (_, grid)
         for _, v in ipairs(Isaac.FindInRadius(grid.Position, 80, EntityPartition.PLAYER)) do
             local data = JumpLib:GetData(v) if data.Jumping and data.Flags & JumpLib.Flags.COLLISION_GRID == 0 then
                 return true
             end
         end
-    end
-    AddCallback(ModCallbacks.MC_PRE_GRID_ENTITY_LOCK_UPDATE, LockUpdate)
+    end)
 
     ---@param entity Entity
     ---@param grid GridEntity?
@@ -1175,7 +1242,9 @@ function LOCAL_JUMPLIB.Init()
         local data = JumpLib:GetData(entity) if data.Jumping and data.Flags & JumpLib.Flags.COLLISION_GRID == 0 then
             return true
         end
-    end for _, v in ipairs({
+    end
+
+    for _, v in ipairs({
         ModCallbacks.MC_PRE_PLAYER_GRID_COLLISION,
         ModCallbacks.MC_PRE_TEAR_GRID_COLLISION,
         ModCallbacks.MC_PRE_FAMILIAR_GRID_COLLISION,
@@ -1194,4 +1263,4 @@ end
 
 return LOCAL_JUMPLIB
 
--- Special thanks to Thicco Catto!!
+-- Special thanks to Thicco Catto
