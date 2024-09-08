@@ -1,6 +1,6 @@
 --[[
     Jump library by Kerkel
-    Version 1.1
+    Version 1.1.1
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
 ]]
@@ -1073,8 +1073,10 @@ function LOCAL_JUMPLIB.Init()
                                     end
                                 end
 
-                                fell = true
-                                JumpLib:Pitfall(player, grid.Position, hurt)
+                                if fall then
+                                    fell = true
+                                    JumpLib:Pitfall(player, grid.Position, hurt)
+                                end
                             end
                         end
                     end
