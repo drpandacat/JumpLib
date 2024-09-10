@@ -1,6 +1,6 @@
 --[[
     Jump library by Kerkel
-    Version 1.1.1
+    Version 1.1.2
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
 ]]
@@ -50,7 +50,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 2 -- 1.1
+    local LOCAL_VERSION = 4 -- 1.1.2
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -1141,6 +1141,7 @@ function LOCAL_JUMPLIB.Init()
         ModCallbacks.MC_PRE_PROJECTILE_RENDER,
         ModCallbacks.MC_PRE_TEAR_RENDER,
         ModCallbacks.MC_PRE_SLOT_RENDER,
+        ModCallbacks.MC_PRE_BOMB_RENDER
     }) do
         AddCallback(v, PreRender)
     end
