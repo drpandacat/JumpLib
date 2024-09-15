@@ -1,6 +1,6 @@
 --[[
     Jump library by Kerkel
-    Version 1.2
+    Version 1.2.1
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
 ]]
@@ -50,7 +50,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 5 -- 1.2
+    local LOCAL_VERSION = 6 -- 1.2.1
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -76,7 +76,7 @@ function LOCAL_JUMPLIB.Init()
     ---* trinket = `TrinketType`
     ---* effect = `CollectibleType`
     ---* player = `PlayerType`
-    ---* weapon = `WeaponType` (REPENTOGON only)
+    ---* weapon = `WeaponType` (REPENTOGON-only)
     JumpLib.Callbacks = {
         ---Called before a player jumps
         ---
@@ -301,7 +301,7 @@ function LOCAL_JUMPLIB.Init()
         ---Use `FAMILIAR_FOLLOW_TEARCOPYING`
         ---@deprecated
         FAMILIAR_FOLLOW_TEARCOPYING_ONLY = 1 << 12,
-        ---Familiars no longer follow the player by default
+        ---Deprecated as familiars no longer follow the player by default
         ---@deprecated
         FAMILIAR_FOLLOW_CUSTOM = 1 << 13,
     }
@@ -518,7 +518,11 @@ function LOCAL_JUMPLIB.Init()
                 data.StoredGridColl = nil
                 data.StoredEntityColl = nil
             end
-        end
+        end,
+
+        GRID_PLAYER_SEARCH_RADIUS = 50,
+        ---Non-REPENTOGON
+        PLAYER_POSITION_OFFSET_MULT = 1.5,
     }
 
     ---@param callback ModCallbacks | JumpCallback
@@ -759,8 +763,8 @@ function LOCAL_JUMPLIB.Init()
         data.Flags = 0
         data.Fallspeed = 0
         data.LaserOffset = nil
+        data.Height = 0
         data.Tags = nil
-
 
         JumpLib.Internal:UpdateCollision(entity)
 
@@ -889,6 +893,7 @@ function LOCAL_JUMPLIB.Init()
     ---@return boolean
     function JumpLib:SetSpeed(entity, speed)
         local data = JumpLib:GetData(entity)
+
         if not data.Jumping then
             return false
         end
@@ -1136,7 +1141,7 @@ function LOCAL_JUMPLIB.Init()
         ---@param player EntityPlayer
         AddCallback(ModCallbacks.MC_POST_PLAYER_UPDATE, function (_, player)
             if JumpLib:GetData(player).Jumping then
-                player.PositionOffset = JumpLib:GetOffset(player) * 1.5
+                player.PositionOffset = JumpLib:GetOffset(player) * JumpLib.Internal.PLAYER_POSITION_OFFSET_MULT
             end
         end)
     end
@@ -1267,18 +1272,18 @@ function LOCAL_JUMPLIB.Init()
     if REPENTOGON then
         ---@param grid GridEntityPressurePlate
         AddCallback(ModCallbacks.MC_PRE_GRID_ENTITY_PRESSUREPLATE_UPDATE, function (_, grid)
-            for _, v in ipairs(Isaac.FindInRadius(grid.Position, 80, EntityPartition.PLAYER)) do
+            for _, v in ipairs(Isaac.FindInRadius(grid.Position, JumpLib.Internal.GRID_PLAYER_SEARCH_RADIUS, EntityPartition.PLAYER)) do
                 local data = JumpLib:GetData(v) if data.Jumping and data.Flags & JumpLib.Flags.COLLISION_GRID == 0 then
-                    return true
+                    return false
                 end
             end
         end)
 
         ---@param grid GridEntity
         AddCallback(ModCallbacks.MC_PRE_GRID_ENTITY_LOCK_UPDATE, function (_, grid)
-            for _, v in ipairs(Isaac.FindInRadius(grid.Position, 80, EntityPartition.PLAYER)) do
+            for _, v in ipairs(Isaac.FindInRadius(grid.Position, JumpLib.Internal.GRID_PLAYER_SEARCH_RADIUS, EntityPartition.PLAYER)) do
                 local data = JumpLib:GetData(v) if data.Jumping and data.Flags & JumpLib.Flags.COLLISION_GRID == 0 then
-                    return true
+                    return false
                 end
             end
         end)
