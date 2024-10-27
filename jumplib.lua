@@ -1,11 +1,12 @@
 --[[
-    Jump library by Kerkel
-    Version 1.2.1
+    Jump Library by Kerkel
+    Version 1.2.2
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
+    GitBook documentation: https://kerkeland.gitbook.io/jumplib
 ]]
 
----@diagnostic disable: undefined-global
+---@diagnostic disable: undefined-global, undefined-field
 
 ---@class JumpData
 ---@field Jumping boolean
@@ -23,6 +24,12 @@
 ---@field Speed number | nil
 ---@field Flags integer | nil
 ---@field Tags string | string[] | nil
+
+---@class PassedJumpConfig
+---@field Height number
+---@field Speed number
+---@field Flags integer
+---@field Tags string[]
 
 ---@class InternalJumpData
 ---@field UpdateFrame integer
@@ -46,11 +53,12 @@
 ---@field SetInitialLaserHeight boolean
 ---@field GridCollToSet GridCollisionClass
 ---@field EntCollToSet EntityCollisionClass
+---@field Familiar Entity
 
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 6 -- 1.2.1
+    local LOCAL_VERSION = 7 -- 1.2.2
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -82,7 +90,7 @@ function LOCAL_JUMPLIB.Init()
         ---
         ---Parameters:
         ---* player - `EntityPlayer`
-        ---* config - `JumpConfig`
+        ---* config - `PassedJumpConfig`
         ---
         ---Returns:
         ---* Return `true` to cancel jump
@@ -92,7 +100,7 @@ function LOCAL_JUMPLIB.Init()
         ---
         ---Parameters:
         ---* player - `EntityPlayer`
-        ---* config - `JumpConfig`
+        ---* config - `PassedJumpConfig`
         POST_PLAYER_JUMP = "JUMPLIB_POST_PLAYER_JUMP",
         ---Called after a player lands
         ---
@@ -105,7 +113,7 @@ function LOCAL_JUMPLIB.Init()
         ---
         ---Parameters:
         ---* entity - `Entity`
-        ---* config - `JumpConfig`
+        ---* config - `PassedJumpConfig`
         ---
         ---Returns:
         ---* Return `true` to cancel jump
@@ -115,7 +123,7 @@ function LOCAL_JUMPLIB.Init()
         ---
         ---Parameters:
         ---* entity - `Entity`
-        ---* config - `JumpConfig`
+        ---* config - `PassedJumpConfig`
         POST_ENTITY_JUMP = "JUMPLIB_POST_ENTITY_JUMP",
         ---Called after an entity lands
         ---
@@ -343,6 +351,8 @@ function LOCAL_JUMPLIB.Init()
             [FamiliarVariant.TWISTED_BABY] = true,
             [FamiliarVariant.UMBILICAL_BABY] = true,
             [FamiliarVariant.BLOOD_BABY] = true,
+            [FamiliarVariant.CAINS_OTHER_EYE] = true,
+            [FamiliarVariant.SPRINKLER] = true,
         },
 
         HOOK_TO_CANCEL = {
@@ -447,7 +457,9 @@ function LOCAL_JUMPLIB.Init()
                             local laserData = JumpLib.Internal:GetData(laser)
 
                             if not (laser.DisableFollowParent or (laser:IsCircleLaser())) or not laserData.SetInitialLaserHeight then
-                                local config = entityData.Config; config.Speed = 0
+                                local config = entityData.Config
+
+                                config.Speed = 0
 
                                 if laser:IsCircleLaser() then
                                     JumpLib:SetHeight(laser, entityData.Height, {Height = 0, Speed = 0.8})
@@ -508,7 +520,9 @@ function LOCAL_JUMPLIB.Init()
                 entity.EntityCollisionClass = data.EntCollToSet or entity.EntityCollisionClass
             else
                 if player then
-                    player:AddCacheFlags(CacheFlag.CACHE_FLYING); player:EvaluateItems()
+                    player:AddCacheFlags(CacheFlag.CACHE_FLYING)
+                    player:EvaluateItems()
+
                     player.EntityCollisionClass = EntityCollisionClass.ENTCOLL_ALL
                 else
                     entity.GridCollisionClass = data.StoredGridColl or entity.GridCollisionClass
@@ -517,6 +531,30 @@ function LOCAL_JUMPLIB.Init()
 
                 data.StoredGridColl = nil
                 data.StoredEntityColl = nil
+            end
+        end,
+
+        ---@param entity Entity
+        ---@return EntityPlayer?
+        GetPlayerFromEntity = function (self, entity)
+            local thingsToCheck = {entity, entity.SpawnerEntity, entity.Parent}
+            local player
+
+            for _, v in pairs(thingsToCheck) do
+                if v then
+                    player = v:ToPlayer() if player then
+                        break
+                    end
+
+                    local familiar = v:ToFamiliar() if familiar then
+                        player = familiar.Player
+                        break
+                    end
+                end
+            end
+
+            if player then
+                return player
             end
         end,
 
@@ -535,7 +573,6 @@ function LOCAL_JUMPLIB.Init()
             Param = param,
         })
     end
-
 
     AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, function ()
         JumpLib.Internal.SchedulerEntries = {}
@@ -565,7 +602,8 @@ function LOCAL_JUMPLIB.Init()
     ---@param entity Entity
     ---@return any[]
     function JumpLib:RunCallbackWithParam(callback, entity, ...)
-        local player = entity:ToPlayer()
+        local directPlayer = entity:ToPlayer()
+        local player = directPlayer or JumpLib.Internal:GetPlayerFromEntity(entity)
         local familiar = entity:ToFamiliar()
         local data = JumpLib.Internal:GetData(entity)
         local returns = {}
@@ -580,16 +618,16 @@ function LOCAL_JUMPLIB.Init()
             local isVariant = not tbl or not param.variant or param.variant == entity.Variant
             local isSubType = not tbl or not param.subtype or param.subtype == entity.SubType
             local hasCollectible = not tbl or not param.collectible or not player or player:HasCollectible(param.collectible)
-            local hasTrinket = not tbl or not param.trinket or not player or player:HasTrinket(param.collectible)
+            local hasTrinket = not tbl or not param.trinket or not player or player:HasTrinket(param.trinket)
             local hasEffect = not tbl or not param.effect or not player or player:GetEffects():HasCollectibleEffect(param.effect)
             local hasTag = not tbl or not param.tag or tags and tags[param.tag]
             local isPlayer = not tbl or not param.player or not player or player:GetPlayerType() == param.player
             local hasWeapon = not tbl or not param.weapon
 
             if REPENTOGON and not hasWeapon then
-                if player then
+                if directPlayer then
                     for i = 0, 4 do
-                        local weapon = player:GetWeapon(i) if weapon and weapon:GetWeaponType() == param.weapon then
+                        local weapon = directPlayer:GetWeapon(i) if weapon and weapon:GetWeaponType() == param.weapon then
                             hasWeapon = true
                             break
                         end
@@ -723,8 +761,8 @@ function LOCAL_JUMPLIB.Init()
                 local familiar = v:ToFamiliar() ---@cast familiar EntityFamiliar
                 local orbital = (orbitals and JumpLib.Internal:IsOrbital(familiar))
 
-                if orbital or (followers and JumpLib.Internal:IsFollower(familiar)) or (tearcopying and JumpLib.Internal.TEAR_COPYING_FAMILIARS[familiar.Variant]) then
-                    local _config = config; if orbital then _config.Flags = _config.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS end
+                if orbital or (followers and JumpLib.Internal:IsFollower(familiar)) or (tearcopying and JumpLib.Internal.TEAR_COPYING_FAMILIARS[familiar.Variant] and JumpLib.Internal:IsFollower(familiar)) then
+                    local _config = config if orbital then _config.Flags = _config.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS end
                     JumpLib:Jump(v, _config)
                 end
             end
@@ -778,7 +816,8 @@ function LOCAL_JUMPLIB.Init()
     ---@return boolean
     function JumpLib:Pitfall(player, position, damage)
         if player.Type ~= EntityType.ENTITY_PLAYER or JumpLib:IsPitfalling(player) or player:IsCoopGhost() then return false end
-        damage  = damage or 1
+
+        damage = damage or 1
 
         player:PlayExtraAnimation("FallIn")
 
@@ -812,7 +851,8 @@ function LOCAL_JUMPLIB.Init()
                 pos = Game():GetRoom():FindFreePickupSpawnPosition(player.Position, (attempts + 1) * 40)
             until JumpLib.Internal:AccessibleFromDoors(pos) or attempts > 40
 
-            player:AddCacheFlags(CacheFlag.CACHE_SIZE); player:EvaluateItems()
+            player:AddCacheFlags(CacheFlag.CACHE_SIZE)
+            player:EvaluateItems()
 
             data.PitPos = pos
         end, JumpLib.Constants.PITFRAME_DAMAGE, true)
@@ -1186,8 +1226,6 @@ function LOCAL_JUMPLIB.Init()
         }) do
             AddCallback(v, PreRender)
         end
-    else
-
     end
 
     ---@param bomb EntityBomb
@@ -1227,12 +1265,29 @@ function LOCAL_JUMPLIB.Init()
         return false
     end)
 
-    ---WIP
-    ---@param tear EntityTear | EntityProjectile
-    local function TearInit(_, tear)
-        if tear.FrameCount ~= 0 then return end
+    ---@param tear EntityTear
+    AddCallback(ModCallbacks.MC_POST_TEAR_INIT, function (_, tear)
         local spawner = tear.SpawnerEntity or tear.Parent if not spawner then return end
         local data = JumpLib:GetData(spawner) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_TEARHEIGHT ~= 0 then return end
+
+        for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_FAMILIAR)) do
+            local dist = v.Position:Distance(tear.Position - tear.Velocity)
+            -- print(dist)
+            if dist < 0.1 then
+                JumpLib.Internal:GetData(tear).Familiar = v
+                break
+            end
+        end
+    end)
+
+    ---@param tear EntityTear | EntityProjectile
+    local function TearUpdate(_, tear)
+        if tear.FrameCount ~= 0 then return end
+
+        local spawner = tear.SpawnerEntity or tear.Parent if not spawner then return end
+        local familiar = JumpLib.Internal:GetData(tear).Familiar
+        -- print(familiar)
+        local data = JumpLib:GetData(familiar or spawner) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_TEARHEIGHT ~= 0 then return end
 
         tear.Height = tear.Height - data.Height * JumpLib.Constants.TEAR_HEIGHT_MULT
     end
@@ -1241,7 +1296,7 @@ function LOCAL_JUMPLIB.Init()
         ModCallbacks.MC_POST_TEAR_UPDATE,
         ModCallbacks.MC_POST_PROJECTILE_UPDATE,
     }) do
-        AddCallback(v, TearInit)
+        AddCallback(v, TearUpdate)
     end
 
     ---@param entity Entity
