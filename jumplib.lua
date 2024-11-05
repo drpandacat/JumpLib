@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.2.2
+    Version 1.2.3
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -58,7 +58,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 7 -- 1.2.2
+    local LOCAL_VERSION = 8 -- 1.2.3
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -130,6 +130,7 @@ function LOCAL_JUMPLIB.Init()
         ---Parameters:
         ---* entity - `Entity`
         ---* data - `JumpData`
+        ---* pitfall - `boolean`
         ENTITY_LAND = "JUMPLIB_ENTITY_LAND",
         ---Called before a player falls into a pit after jumping
         ---
@@ -680,7 +681,14 @@ function LOCAL_JUMPLIB.Init()
         end
 
         local player = entity:ToPlayer()
-        local returns = JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_JUMP, entity, config)
+
+        local copy = {}
+
+        for k, v in pairs(config) do
+            copy[k] = v
+        end
+
+        local returns = JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_JUMP, entity, copy)
 
         if player then
             for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_PLAYER_JUMP, player, config)) do
@@ -688,10 +696,15 @@ function LOCAL_JUMPLIB.Init()
             end
         end
 
-        if not force then
+        if not force and (config.Flags & JumpLib.Flags.IGNORE_CONFIG_OVERRIDE == 0) then
             for _, v in ipairs(returns) do
                 if type(v) == "table" then
+                    if config.Flags & JumpLib.Flags.IGNORE_FALLSPEED_MODIFIERS ~= 0 then
+                        v.Speed = config.Speed
+                    end
+
                     config = v
+
                     break
                 elseif v == true then
                     return false
@@ -761,9 +774,9 @@ function LOCAL_JUMPLIB.Init()
                 local familiar = v:ToFamiliar() ---@cast familiar EntityFamiliar
                 local orbital = (orbitals and JumpLib.Internal:IsOrbital(familiar))
 
-                if orbital or (followers and JumpLib.Internal:IsFollower(familiar)) or (tearcopying and JumpLib.Internal.TEAR_COPYING_FAMILIARS[familiar.Variant] and JumpLib.Internal:IsFollower(familiar)) then
+                if orbital or (followers and (JumpLib.Internal:IsFollower(familiar) or familiar.Variant == FamiliarVariant.BLOOD_BABY)) or (tearcopying and JumpLib.Internal.TEAR_COPYING_FAMILIARS[familiar.Variant] and familiar.Variant ~= FamiliarVariant.SPRINKLER) then
                     local _config = config if orbital then _config.Flags = _config.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS end
-                    JumpLib:Jump(v, _config)
+                    JumpLib:Jump(v, _config, force)
                 end
             end
         end
@@ -1084,7 +1097,7 @@ function LOCAL_JUMPLIB.Init()
 
         if entityData.Height == 0 then
             entityData.PrevTags = entityData.Tags
-            JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_LAND, entity, jumpData)
+
             JumpLib:QuitJump(entity)
 
             if player then
@@ -1149,6 +1162,7 @@ function LOCAL_JUMPLIB.Init()
                     end
                 end
 
+                JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_LAND, entity, jumpData, fell)
                 JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PLAYER_LAND, player, jumpData, fell)
 
                 if not REPENTOGON then
@@ -1272,7 +1286,7 @@ function LOCAL_JUMPLIB.Init()
 
         for _, v in ipairs(Isaac.FindByType(EntityType.ENTITY_FAMILIAR)) do
             local dist = v.Position:Distance(tear.Position - tear.Velocity)
-            -- print(dist)
+
             if dist < 0.1 then
                 JumpLib.Internal:GetData(tear).Familiar = v
                 break
@@ -1286,7 +1300,6 @@ function LOCAL_JUMPLIB.Init()
 
         local spawner = tear.SpawnerEntity or tear.Parent if not spawner then return end
         local familiar = JumpLib.Internal:GetData(tear).Familiar
-        -- print(familiar)
         local data = JumpLib:GetData(familiar or spawner) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_TEARHEIGHT ~= 0 then return end
 
         tear.Height = tear.Height - data.Height * JumpLib.Constants.TEAR_HEIGHT_MULT
