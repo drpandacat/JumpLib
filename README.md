@@ -1,4 +1,4 @@
-# Jump Library (1.2.3)
+# Jump Library (1.2.3.1)
 JumpLib is a library for Isaac Repentance mods that allows for easy and customizable functionality around moving the entities through the air, avoiding mod conflicts when used across multiple mods
 ### Features
 - 13 functions (including `GetData`, `Jump`, `SetHeight`, `IsFalling`, + more)
