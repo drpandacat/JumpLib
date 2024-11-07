@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.2.3
+    Version 1.2.3.1
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -58,7 +58,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 8 -- 1.2.3
+    local LOCAL_VERSION = 9 -- 1.2.3.1
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -1100,9 +1100,9 @@ function LOCAL_JUMPLIB.Init()
 
             JumpLib:QuitJump(entity)
 
-            if player then
-                local fell
+            local fell
 
+            if player then
                 if jumpData.Flags & JumpLib.Flags.NO_PITFALL == 0 then
                     if jumpData.Flags & JumpLib.Flags.COLLISION_GRID == 0 then
 
@@ -1162,12 +1162,15 @@ function LOCAL_JUMPLIB.Init()
                     end
                 end
 
-                JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_LAND, entity, jumpData, fell)
-                JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PLAYER_LAND, player, jumpData, fell)
-
                 if not REPENTOGON then
                     player.PositionOffset = JumpLib.Internal.Vector.Zero
                 end
+            end
+
+            JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_LAND, entity, jumpData, fell)
+
+            if player then
+                JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PLAYER_LAND, player, jumpData, fell)
             end
 
             entityData.PrevTags = nil
