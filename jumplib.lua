@@ -432,28 +432,8 @@ function LOCAL_JUMPLIB.Init()
     ---@deprecated
     function JumpLib.Internal:LaserBehaviorsFromEntity() end
 
-    ---@param position Vector
-    function JumpLib.Internal:AccessibleFromDoors(position)
-        for i = DoorSlot.LEFT0, DoorSlot.NUM_DOOR_SLOTS - 1 do
-            local door = game:GetRoom():GetDoor(i) if door then
-                local npc = game:Spawn(
-                    EntityType.ENTITY_SHOPKEEPER, 0,
-                    door.Position + JumpLib.Internal.DOOR_DIRECTION_TO_OFFSET[door.Direction],
-                    JumpLib.Internal.Vector.Zero,
-                    nil,
-                    0,
-                    math.max(Random(), 1)
-                ):ToNPC() ---@cast npc EntityNPC
-
-                npc.Visible = false
-                npc:Remove()
-
-                if npc.Pathfinder:HasPathToPos(position, true) then
-                    return true
-                end
-            end
-        end
-    end
+    ---@deprecated
+    function JumpLib.Internal:AccessibleFromDoors() end
 
     ---@param entity Entity
     function JumpLib.Internal:UpdateCollision(entity)
@@ -808,18 +788,27 @@ function LOCAL_JUMPLIB.Init()
         JumpLib.Internal:ScheduleFunction(function ()
             player:AnimatePitfallOut()
 
-            local attempts = 0
-            local pos = game:GetRoom():FindFreePickupSpawnPosition(player.Position, 40)
+            local room = game:GetRoom()
+            local closestPos
 
-            repeat
-                attempts = attempts + 1
-                pos = game:GetRoom():FindFreePickupSpawnPosition(player.Position, (attempts + 1) * 40)
-            until JumpLib.Internal:AccessibleFromDoors(pos) or attempts > 40
+            for i = DoorSlot.LEFT0, DoorSlot.DOWN1 do
+                local door = room:GetDoor(i)
+
+                if door then
+                    local pos = door.Position
+
+                    if not closestPos or player.Position:Distance(pos) < player.Position:Distance(closestPos) then
+                        closestPos = pos
+                    end
+                end
+            end
+
+            closestPos = closestPos or room:FindFreePickupSpawnPosition(player.Position, 40)
 
             player:AddCacheFlags(CacheFlag.CACHE_SIZE)
             player:EvaluateItems()
 
-            data.PitPos = pos
+            data.PitPos = room:GetClampedPosition(closestPos, 20)
         end, JumpLib.Constants.PITFRAME_DAMAGE, true)
 
         JumpLib.Internal:ScheduleFunction(function ()
