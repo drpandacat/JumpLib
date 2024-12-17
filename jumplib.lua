@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.3
+    Version 1.3.1
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -54,11 +54,12 @@
 ---@field GridCollToSet GridCollisionClass
 ---@field EntCollToSet EntityCollisionClass
 ---@field Familiar Entity
+---@field JumpPos Vector
 
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 10
+    local LOCAL_VERSION = 11
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -643,6 +644,7 @@ function LOCAL_JUMPLIB.Init()
 
         if not data.Jumping then
             table.insert(JumpLib.Internal.ActiveEntities, entity)
+            data.JumpPos = entity.Position
         end
 
         data.Flags = config.Flags
@@ -788,27 +790,10 @@ function LOCAL_JUMPLIB.Init()
         JumpLib.Internal:ScheduleFunction(function ()
             player:AnimatePitfallOut()
 
-            local room = game:GetRoom()
-            local closestPos
-
-            for i = DoorSlot.LEFT0, DoorSlot.DOWN1 do
-                local door = room:GetDoor(i)
-
-                if door then
-                    local pos = door.Position
-
-                    if not closestPos or player.Position:Distance(pos) < player.Position:Distance(closestPos) then
-                        closestPos = pos
-                    end
-                end
-            end
-
-            closestPos = closestPos or room:FindFreePickupSpawnPosition(player.Position, 40)
-
             player:AddCacheFlags(CacheFlag.CACHE_SIZE)
             player:EvaluateItems()
 
-            data.PitPos = room:GetClampedPosition(closestPos, 20)
+            data.PitPos = data.JumpPos
         end, JumpLib.Constants.PITFRAME_DAMAGE, true)
 
         JumpLib.Internal:ScheduleFunction(function ()
@@ -1121,7 +1106,7 @@ function LOCAL_JUMPLIB.Init()
         player.GridCollisionClass = EntityGridCollisionClass.GRIDCOLL_NONE
         player.EntityCollisionClass = EntityCollisionClass.ENTCOLL_NONE
 
-        player.Velocity = (data.PitPos - player.Position) * 0.1
+        player.Velocity = (data.PitPos - player.Position):Resized(player.Position:Distance(data.PitPos) * 0.2)
 
         if player:GetSprite():IsFinished("FallIn") then
             player.SpriteScale = JumpLib.Internal.Vector.Zero
@@ -1142,14 +1127,17 @@ function LOCAL_JUMPLIB.Init()
     AddCallback(REPENTOGON and ModCallbacks.MC_PRE_LASER_UPDATE or ModCallbacks.MC_POST_LASER_UPDATE, function (_, laser)
         if laser.Variant == LaserVariant.TRACTOR_BEAM then return end
 
-        local entity = laser.SpawnerEntity or laser.Parent
+        local entity = laser.Parent
+
+        if not entity then return end
+
         local entityData = entity and JumpLib.Internal:GetData(entity)
 
         if entityData and entityData.Jumping then
             if JumpLib:GetData(entity).Flags & JumpLib.Flags.LASER_FOLLOW_CUSTOM == 0 then
                 local laserData = JumpLib.Internal:GetData(laser)
 
-                if not (laser.DisableFollowParent or (laser:IsCircleLaser())) or not laserData.SetInitialLaserHeight then
+                if not (laser.DisableFollowParent or laser:IsCircleLaser()) or not laserData.SetInitialLaserHeight then
                     local config = entityData.Config
 
                     config.Speed = 0
@@ -1165,6 +1153,7 @@ function LOCAL_JUMPLIB.Init()
 
                     laserData.SetInitialLaserHeight = true
                 end
+
                 laser.PositionOffset = JumpLib:GetOffset(laser)
             end
         end
@@ -1187,8 +1176,8 @@ function LOCAL_JUMPLIB.Init()
 
     ---@param bomb EntityBomb
     AddCallback(ModCallbacks.MC_POST_BOMB_INIT, function (_, bomb)
-        if bomb.SpawnerType ~= EntityType.ENTITY_PLAYER then return end
-        local data = JumpLib:GetData(bomb.SpawnerEntity) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_COOL_BOMBS ~= 0 then return end
+        if not (bomb.Parent and bomb.Parent.Type == EntityType.ENTITY_PLAYER) then return end
+        local data = JumpLib:GetData(bomb.Parent) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_COOL_BOMBS ~= 0 then return end
 
         JumpLib:SetHeight(bomb, data.Height, {
             Height = 0,
@@ -1240,6 +1229,7 @@ function LOCAL_JUMPLIB.Init()
     ---@param tear EntityTear | EntityProjectile
     local function TearUpdate(_, tear)
         if tear.FrameCount ~= 0 then return end
+        if tear.Type == EntityType.ENTITY_TEAR and tear:HasTearFlags(TearFlags.TEAR_CHAIN) then return end
 
         local spawner = tear.SpawnerEntity or tear.Parent if not spawner then return end
         local familiar = JumpLib.Internal:GetData(tear).Familiar
