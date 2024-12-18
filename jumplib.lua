@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.3.1
+    Version 1.3.1.1
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -59,7 +59,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 11
+    local LOCAL_VERSION = 12
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -1176,8 +1176,8 @@ function LOCAL_JUMPLIB.Init()
 
     ---@param bomb EntityBomb
     AddCallback(ModCallbacks.MC_POST_BOMB_INIT, function (_, bomb)
-        if not (bomb.Parent and bomb.Parent.Type == EntityType.ENTITY_PLAYER) then return end
-        local data = JumpLib:GetData(bomb.Parent) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_COOL_BOMBS ~= 0 then return end
+        if not (bomb.SpawnerEntity and bomb.SpawnerEntity.Type == EntityType.ENTITY_PLAYER) then return end
+        local data = JumpLib:GetData(bomb.SpawnerEntity) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_COOL_BOMBS ~= 0 then return end
 
         JumpLib:SetHeight(bomb, data.Height, {
             Height = 0,
