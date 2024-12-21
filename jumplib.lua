@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.3.1.1
+    Version 1.3.2
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -793,7 +793,7 @@ function LOCAL_JUMPLIB.Init()
             player:AddCacheFlags(CacheFlag.CACHE_SIZE)
             player:EvaluateItems()
 
-            data.PitPos = data.JumpPos
+            data.PitPos = data.JumpPos or game:GetRoom():FindFreePickupSpawnPosition(player.Position, 40, true, true)
         end, JumpLib.Constants.PITFRAME_DAMAGE, true)
 
         JumpLib.Internal:ScheduleFunction(function ()
@@ -1123,13 +1123,14 @@ function LOCAL_JUMPLIB.Init()
     end
 
     ---@param laser EntityLaser
-    ---@diagnostic disable-next-line: undefined-field
-    AddCallback(REPENTOGON and ModCallbacks.MC_PRE_LASER_UPDATE or ModCallbacks.MC_POST_LASER_UPDATE, function (_, laser)
+    AddCallback(ModCallbacks.MC_POST_LASER_RENDER, function (_, laser)
         if laser.Variant == LaserVariant.TRACTOR_BEAM then return end
 
         local entity = laser.Parent
 
         if not entity then return end
+
+        if game:GetRoom():GetRenderMode() == RenderMode.RENDER_WATER_REFLECT then return end
 
         local entityData = entity and JumpLib.Internal:GetData(entity)
 
@@ -1177,6 +1178,7 @@ function LOCAL_JUMPLIB.Init()
     ---@param bomb EntityBomb
     AddCallback(ModCallbacks.MC_POST_BOMB_INIT, function (_, bomb)
         if not (bomb.SpawnerEntity and bomb.SpawnerEntity.Type == EntityType.ENTITY_PLAYER) then return end
+        if bomb.Position:Distance(bomb.SpawnerEntity.Position) > 1 then return end
         local data = JumpLib:GetData(bomb.SpawnerEntity) if not data.Jumping or data.Flags & JumpLib.Flags.DISABLE_COOL_BOMBS ~= 0 then return end
 
         JumpLib:SetHeight(bomb, data.Height, {
