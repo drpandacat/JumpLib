@@ -59,7 +59,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 12
+    local LOCAL_VERSION = 13
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
