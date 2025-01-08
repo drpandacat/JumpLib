@@ -8,7 +8,7 @@ JumpLib was made to counteract common incompatibility issues across the mods tha
 # Why use it?
 - Easy to use and set up, requires no dependencies, and can be included right inside of your mod
 - 21 jump flags for modifying jump behavior!
-- 11 unique callbacks + 8 additional player-specific versions that pass an `EntityPlayer`!
+- 11 callbacks
 - Customizable familiar, knife, and laser follow behavior while their parent is jumping!
 - "Tag" system for attaching identifiers to jumps, as to identify the cause of jumps or to only run code for certain ones!
 - Cool bomb behavior, allowing for dropping bombs mid-air (configurable through jump flags)
