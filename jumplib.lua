@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.3.2
+    Version 1.3.3
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -87,29 +87,6 @@ function LOCAL_JUMPLIB.Init()
     ---* player = `PlayerType`
     ---* weapon = `WeaponType` (REPENTOGON-only)
     JumpLib.Callbacks = {
-        ---Called before a player jumps
-        ---
-        ---Parameters:
-        ---* player - `EntityPlayer`
-        ---* config - `PassedJumpConfig`
-        ---
-        ---Returns:
-        ---* Return `true` to cancel jump
-        ---* Return `JumpConfig` object to override config
-        PRE_PLAYER_JUMP = "JUMPLIB_PRE_PLAYER_JUMP",
-        ---Called after a player jumps
-        ---
-        ---Parameters:
-        ---* player - `EntityPlayer`
-        ---* config - `PassedJumpConfig`
-        POST_PLAYER_JUMP = "JUMPLIB_POST_PLAYER_JUMP",
-        ---Called after a player lands
-        ---
-        ---Parameters:
-        ---* player - `EntityPlayer`
-        ---* data - `JumpData`
-        ---* pitfall - `boolean`
-        PLAYER_LAND = "JUMPLIB_PLAYER_LAND",
         ---Called before an entity jumps
         ---
         ---Parameters:
@@ -161,23 +138,6 @@ function LOCAL_JUMPLIB.Init()
         ---* player - `EntityPlayer`
         ---* data - `JumpData`
         PITFALL_EXIT = "JUMPLIB_PITFALL_EXIT",
-        ---Called before setting a player's fallspeed
-        ---
-        ---Parameters:
-        ---* player - `EntityPlayer`
-        ---* speed - `number`
-        ---* data - `JumpData`
-        ---Returns:
-        ---* Return `true` to cancel
-        ---* Return `number` to multiply provided speed by
-        PRE_PLAYER_SET_FALLSPEED = "JUMPLIB_PRE_PLAYER_SET_FALLSPEED",
-        ---Called after setting a player's fallspeed
-        ---
-        ---Parameters:
-        ---* player - `EntityPlayer`
-        ---* speed - `number`
-        ---* data - `JumpData`
-        POST_PLAYER_SET_FALLSPEED = "JUMPLIB_POST_PLAYER_SET_FALLSPEED",
         ---Called before setting an entity's fallspeed
         ---
         ---Parameters:
@@ -195,22 +155,6 @@ function LOCAL_JUMPLIB.Init()
         ---* speed - `number`
         ---* data - `JumpData`
         POST_ENTITY_SET_FALLSPEED = "JUMPLIB_POST_ENTITY_SET_FALLSPEED",
-        ---@deprecated
-        GET_LASER_CAN_FOLLOW_ENTITY = "JUMPLIB_GET_LASER_CAN_FOLLOW_ENTITY",
-        ---@deprecated
-        GET_LASER_CAN_FOLLOW_PLAYER = "JUMPLIB_GET_LASER_CAN_FOLLOW_PLAYER",
-        ---Runs 30 times per second for every player in the air
-        ---
-        ---Parameters:
-        ---* player - `EntityPlayer`
-        ---* data - `JumpData`
-        PLAYER_UPDATE_30 = "JUMPLIB_PLAYER_UPDATE_30",
-        ---Runs 60 times per second for every player in the air
-        ---
-        ---Parameters:
-        ---* player - `EntityPlayer`
-        ---* data - `JumpData`
-        PLAYER_UPDATE_60 = "JUMPLIB_PLAYER_UPDATE_60",
         ---Runs 30 times per second for every entity in the air
         ---
         ---Parameters:
@@ -232,15 +176,26 @@ function LOCAL_JUMPLIB.Init()
         ---Returns:
         ---* Return `true` to cancel the update
         PRE_ENTITY_UPDATE = "JUMPLIB_PRE_ENTITY_UPDATE",
-        ---Runs 60 times per second for every player in the air, before `PLAYER_UPDATE_60`
-        ---
-        ---Parameters:
-        ---* players - `EntityPlayer`
-        ---* data - `JumpData`
-        ---
-        ---Returns:
-        ---* Return `true` to cancel the update
+        ---@deprecated
+        PRE_PLAYER_JUMP = "JUMPLIB_PRE_PLAYER_JUMP",
+        ---@deprecated
+        POST_PLAYER_JUMP = "JUMPLIB_POST_PLAYER_JUMP",
+        ---@deprecated
+        PLAYER_LAND = "JUMPLIB_PLAYER_LAND",
+        ---@deprecated
+        PRE_PLAYER_SET_FALLSPEED = "JUMPLIB_PRE_PLAYER_SET_FALLSPEED",
+        ---@deprecated
+        POST_PLAYER_SET_FALLSPEED = "JUMPLIB_POST_PLAYER_SET_FALLSPEED",
+        ---@deprecated
         PRE_PLAYER_UPDATE = "JUMPLIB_PRE_PLAYER_UPDATE",
+        ---@deprecated
+        GET_LASER_CAN_FOLLOW_ENTITY = "JUMPLIB_GET_LASER_CAN_FOLLOW_ENTITY",
+        ---@deprecated
+        GET_LASER_CAN_FOLLOW_PLAYER = "JUMPLIB_GET_LASER_CAN_FOLLOW_PLAYER",
+        ---@deprecated
+        PLAYER_UPDATE_30 = "JUMPLIB_PLAYER_UPDATE_30",
+        ---@deprecated
+        PLAYER_UPDATE_60 = "JUMPLIB_PLAYER_UPDATE_60",
     }
 
     JumpLib.Flags = {
@@ -343,6 +298,24 @@ function LOCAL_JUMPLIB.Init()
             ModCallbacks.MC_PRE_PROJECTILE_RENDER,
             ModCallbacks.MC_PRE_NPC_RENDER,
             ModCallbacks.MC_PRE_EFFECT_RENDER,
+        },
+        PLAYER_TO_ENTITY_CALLBACK = {
+            ---@diagnostic disable-next-line: deprecated
+            [JumpLib.Callbacks.PLAYER_LAND] = JumpLib.Callbacks.ENTITY_LAND,
+            ---@diagnostic disable-next-line: deprecated
+            [JumpLib.Callbacks.PLAYER_UPDATE_30] = JumpLib.Callbacks.ENTITY_UPDATE_30,
+            ---@diagnostic disable-next-line: deprecated
+            [JumpLib.Callbacks.PLAYER_UPDATE_60] = JumpLib.Callbacks.ENTITY_UPDATE_60,
+            ---@diagnostic disable-next-line: deprecated
+            [JumpLib.Callbacks.PRE_PLAYER_JUMP] = JumpLib.Callbacks.PRE_ENTITY_JUMP,
+            ---@diagnostic disable-next-line: deprecated
+            [JumpLib.Callbacks.PRE_PLAYER_UPDATE] = JumpLib.Callbacks.PRE_ENTITY_UPDATE,
+            ---@diagnostic disable-next-line: deprecated
+            [JumpLib.Callbacks.PRE_PLAYER_SET_FALLSPEED] = JumpLib.Callbacks.PRE_ENTITY_SET_FALLSPEED,
+            ---@diagnostic disable-next-line: deprecated
+            [JumpLib.Callbacks.POST_PLAYER_JUMP] = JumpLib.Callbacks.POST_ENTITY_JUMP,
+            ---@diagnostic disable-next-line: deprecated
+            [JumpLib.Callbacks.POST_PLAYER_SET_FALLSPEED] = JumpLib.Callbacks.POST_ENTITY_SET_FALLSPEED,
         },
         TEAR_COPYING_FAMILIARS = {
             [FamiliarVariant.INCUBUS] = true,
@@ -623,13 +596,7 @@ function LOCAL_JUMPLIB.Init()
             passedConfig = config
         end
 
-        local returns = JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_JUMP, entity, passedConfig)
-
-        if player then
-            for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_PLAYER_JUMP, player, config)) do
-                table.insert(returns, v)
-            end
-        end
+        local returns = JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_JUMP, player or entity, passedConfig)
 
         if not force and (config.Flags & JumpLib.Flags.IGNORE_CONFIG_OVERRIDE == 0) then
             for _, v in ipairs(returns) do
@@ -693,11 +660,9 @@ function LOCAL_JUMPLIB.Init()
             end
         end
 
-        JumpLib:RunCallbackWithParam(JumpLib.Callbacks.POST_ENTITY_JUMP, entity, config)
+        JumpLib:RunCallbackWithParam(JumpLib.Callbacks.POST_ENTITY_JUMP, player or entity, config)
 
         if player then
-            JumpLib:RunCallbackWithParam(JumpLib.Callbacks.POST_PLAYER_JUMP, player, config)
-
             local orbitals = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_ORBITALS ~= 0
             local followers = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_FOLLOWERS ~= 0
             local tearcopying = data.Flags & JumpLib.Flags.FAMILIAR_FOLLOW_TEARCOPYING ~= 0
@@ -880,15 +845,7 @@ function LOCAL_JUMPLIB.Init()
         local player = entity:ToPlayer()
 
         if data.Flags & JumpLib.Flags.IGNORE_FALLSPEED_MODIFIERS == 0 then
-            local returns = {}
-
-            if player then
-                returns = JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_PLAYER_SET_FALLSPEED, player, speed, JumpLib:GetData(player))
-            end
-
-            for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_SET_FALLSPEED, entity, speed, JumpLib:GetData(entity))) do
-                table.insert(returns, v)
-            end
+            local returns = JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_SET_FALLSPEED, player or entity, speed, JumpLib:GetData(entity))
 
             for _, v in ipairs(returns) do
                 if type(v) == "number" then
@@ -901,11 +858,7 @@ function LOCAL_JUMPLIB.Init()
 
         JumpLib.Internal:GetData(entity).Fallspeed = speed
 
-        if player then
-            JumpLib:RunCallbackWithParam(JumpLib.Callbacks.POST_PLAYER_SET_FALLSPEED, player, speed, JumpLib:GetData(player))
-        end
-
-        JumpLib:RunCallbackWithParam(JumpLib.Callbacks.POST_ENTITY_SET_FALLSPEED, entity, speed, JumpLib:GetData(entity))
+        JumpLib:RunCallbackWithParam(JumpLib.Callbacks.POST_ENTITY_SET_FALLSPEED, player or entity, speed, JumpLib:GetData(entity))
 
         return true
     end
@@ -966,26 +919,14 @@ function LOCAL_JUMPLIB.Init()
         entityData.UpdateFrame = (entityData.UpdateFrame or 1) + 1
 
         if entityData.Jumping then
-            for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_UPDATE, entity, jumpData)) do
+            for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_ENTITY_UPDATE, player or entity, jumpData)) do
                 if v == true then
                     return
                 end
             end
 
-            if player then
-                for _, v in ipairs(JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PRE_PLAYER_UPDATE, player, jumpData)) do
-                    if v == true then
-                        return
-                    end
-                end
-            end
-
-            if entityData.UpdateFrame % 2 == 0 then
-                JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_UPDATE_30, entity, jumpData)
-
-                if player and entityData.Jumping then
-                    JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PLAYER_UPDATE_30, player, jumpData)
-                end
+            if entityData.UpdateFrame % 2 == 0 and entityData.Jumping then
+                JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_UPDATE_30, player or entity, jumpData)
             end
 
             entityData.Fallspeed = entityData.Fallspeed + JumpLib.Constants.FALLSPEED_INCR * entityData.StaticJumpSpeed
@@ -999,11 +940,7 @@ function LOCAL_JUMPLIB.Init()
             end
 
             JumpLib.Internal:UpdateCollision(entity)
-            JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_UPDATE_60, entity, jumpData)
-
-            if player then
-                JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PLAYER_UPDATE_60, player, jumpData)
-            end
+            JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_UPDATE_60, player or entity, jumpData)
 
             if entityData.Height == 0 then
                 entityData.PrevTags = entityData.Tags
@@ -1077,11 +1014,7 @@ function LOCAL_JUMPLIB.Init()
                     end
                 end
 
-                JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_LAND, entity, jumpData, fell)
-
-                if player then
-                    JumpLib:RunCallbackWithParam(JumpLib.Callbacks.PLAYER_LAND, player, jumpData, fell)
-                end
+                JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_LAND, player or entity, jumpData, fell)
 
                 entityData.PrevTags = nil
             end
@@ -1301,6 +1234,20 @@ function LOCAL_JUMPLIB.Init()
             AddCallback(v, GridCollision)
         end
     end
+
+    AddCallback(ModCallbacks.MC_POST_GAME_STARTED, function ()
+        for playerCallback, entityCallback in pairs(JumpLib.Internal.PLAYER_TO_ENTITY_CALLBACK) do
+            for _, callbackEntry in pairs(Isaac.GetCallbacks(playerCallback)) do
+                -- print("Patching callback " .. playerCallback .. " to " .. entityCallback .. " from mod " .. callbackEntry.Mod.Name .. "!")
+                local param = callbackEntry.Param
+                param = param or {}
+                ---@diagnostic disable-next-line: inject-field
+                param.type = EntityType.ENTITY_PLAYER
+                callbackEntry.Mod:RemoveCallback(playerCallback, callbackEntry.Function)
+                callbackEntry.Mod:AddCallback(entityCallback, callbackEntry.Function, param)
+            end
+        end
+    end)
 
     for _, v in ipairs(JumpLib.Internal.CallbackEntries) do
         if v.Priority then
