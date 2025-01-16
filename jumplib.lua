@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.3.3
+    Version 1.3.5
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -59,7 +59,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 13
+    local LOCAL_VERSION = 15
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -228,28 +228,28 @@ function LOCAL_JUMPLIB.Init()
         ---Tear-copying familiars will follow the player while jumping
         FAMILIAR_FOLLOW_TEARCOPYING = 1 << 12,
         ---Lasers will not use default jumping behaviors
-        LASER_FOLLOW_CUSTOM = 1 << 13,
+        LASER_FOLLOW_CUSTOM = 1 << 14,
         ---Bombs drop as if you were not jumping
-        DISABLE_COOL_BOMBS = 1 << 14,
+        DISABLE_COOL_BOMBS = 1 << 15,
         ---Bombs are unable to be dropped
-        DISABLE_BOMB_INPUT = 1 << 15,
+        DISABLE_BOMB_INPUT = 1 << 16,
         ---Player is unable to shoot
-        DISABLE_SHOOTING_INPUT = 1 << 16,
+        DISABLE_SHOOTING_INPUT = 1 << 17,
         ---Disables tears and projectiles being spawned at spawner height
-        DISABLE_TEARHEIGHT = 1 << 17,
+        DISABLE_TEARHEIGHT = 1 << 18,
         ---Entity will not collide with walls
-        GRIDCOLL_NO_WALLS = 1 << 18,
+        GRIDCOLL_NO_WALLS = 1 << 19,
         ---Damage is not prevented while in the air
-        DAMAGE_CUSTOM = 1 << 19,
+        DAMAGE_CUSTOM = 1 << 20,
         ---Following familiars will follow the player while jumping
-        FAMILIAR_FOLLOW_FOLLOWERS = 1 << 20,
+        FAMILIAR_FOLLOW_FOLLOWERS = 1 << 21,
         ---Player is unable to move
-        DISABLE_MOVING_INPUT = 1 << 21,
+        DISABLE_MOVING_INPUT = 1 << 22,
         ---Player can't use consumables
-        DISABLE_PILL_CARD_INPUT = 1 << 22,
+        DISABLE_PILL_CARD_INPUT = 1 << 23,
         ---Player can't use active item
-        DISABLE_ACTIVE_ITEM_INPUT = 1 << 23,
-        
+        DISABLE_ACTIVE_ITEM_INPUT = 1 << 24,
+
         ---Use `FAMILIAR_FOLLOW_ORBITALS`
         ---@deprecated
         FAMILIAR_FOLLOW_ORBITALS_ONLY =  1 << 11,
@@ -1196,33 +1196,17 @@ function LOCAL_JUMPLIB.Init()
     ---@param hook InputHook
     ---@param action ButtonAction
     AddCallback(ModCallbacks.MC_INPUT_ACTION, function (_, entity, hook, action)
-        local player = entity and entity:ToPlayer() if not player then return end
-        local data = JumpLib:GetData(player) if not data.Jumping then return end
+        if not entity then return end
 
-        if data.Flags & JumpLib.Flags.DISABLE_BOMB_INPUT ~= 0 then
-            if action == ButtonAction.ACTION_BOMB then
-                return JumpLib.Internal.HOOK_TO_CANCEL[hook]
-            end
-        elseif data.Flags & JumpLib.Flags.DISABLE_SHOOTING_INPUT ~= 0 then
-            if JumpLib.Internal.SHOOT_ACTIONS[action] then
-                return JumpLib.Internal.HOOK_TO_CANCEL[hook]
-            end
-        end
-        if data.Flags & JumpLib.Flags.DISABLE_MOVING_INPUT ~= 0 then
-            if JumpLib.Internal.MOVE_ACTIONS[action] then
-                return JumpLib.Internal.HOOK_TO_CANCEL[hook]
-            end
-        end
-        if data.Flags & JumpLib.Flags.DISABLE_PILL_CARD_INPUT ~= 0 then
-            if action == ButtonAction.ACTION_PILLCARD then
-                return JumpLib.Internal.HOOK_TO_CANCEL[hook]
-            end
-        end
-        if data.Flags & JumpLib.Flags.DISABLE_ACTIVE_ITEM_INPUT ~= 0 then
-            if action == ButtonAction.ACTION_ITEM then
-                return JumpLib.Internal.HOOK_TO_CANCEL[hook]
-            end
-        end        
+        local data = JumpLib:GetData(entity) if not data.Jumping then return end
+
+        if (JumpLib.Internal.MOVE_ACTIONS[action] and data.Flags & JumpLib.Flags.DISABLE_MOVING_INPUT ~= 0)
+        or (JumpLib.Internal.SHOOT_ACTIONS[action] and data.Flags & JumpLib.Flags.DISABLE_SHOOTING_INPUT ~= 0)
+        or (action == ButtonAction.ACTION_BOMB and data.Flags & JumpLib.Flags.DISABLE_BOMB_INPUT ~= 0)
+        or (action == ButtonAction.ACTION_PILLCARD and data.Flags & JumpLib.Flags.DISABLE_PILL_CARD_INPUT ~= 0)
+        or (action == ButtonAction.ACTION_ITEM and data.Flags & JumpLib.Flags.DISABLE_ACTIVE_ITEM_INPUT ~= 0) then
+            return JumpLib.Internal.HOOK_TO_CANCEL[hook]
+        end     
     end)
 
     ---@param entity Entity
@@ -1260,6 +1244,12 @@ function LOCAL_JUMPLIB.Init()
         }) do
             AddCallback(v, GridCollision)
         end
+
+        ---@param effect EntityEffect
+        AddCallback(ModCallbacks.MC_PRE_EFFECT_RENDER, function (_, effect)
+            if not effect.Parent then return end
+            return JumpLib:GetOffset(effect.Parent)
+        end, 201)
     end
 
     AddCallback(ModCallbacks.MC_POST_GAME_STARTED, function ()
