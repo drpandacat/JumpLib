@@ -243,7 +243,13 @@ function LOCAL_JUMPLIB.Init()
         DAMAGE_CUSTOM = 1 << 19,
         ---Following familiars will follow the player while jumping
         FAMILIAR_FOLLOW_FOLLOWERS = 1 << 20,
-
+        ---Player is unable to move
+        DISABLE_MOVING_INPUT = 1 << 21,
+        ---Player can't use consumables
+        DISABLE_PILL_CARD_INPUT = 1 << 22,
+        ---Player can't use active item
+        DISABLE_ACTIVE_ITEM_INPUT = 1 << 23,
+        
         ---Use `FAMILIAR_FOLLOW_ORBITALS`
         ---@deprecated
         FAMILIAR_FOLLOW_ORBITALS_ONLY =  1 << 11,
@@ -335,6 +341,12 @@ function LOCAL_JUMPLIB.Init()
             [ButtonAction.ACTION_SHOOTRIGHT] = true,
             [ButtonAction.ACTION_SHOOTUP] = true,
             [ButtonAction.ACTION_SHOOTDOWN] = true,
+        },
+        MOVE_ACTIONS = {
+            [ButtonAction.ACTION_LEFT] = true,
+            [ButtonAction.ACTION_RIGHT] = true,
+            [ButtonAction.ACTION_UP] = true,
+            [ButtonAction.ACTION_DOWN] = true,
         },
         SchedulerEntries = {},
         Vector = {
@@ -1196,6 +1208,21 @@ function LOCAL_JUMPLIB.Init()
                 return JumpLib.Internal.HOOK_TO_CANCEL[hook]
             end
         end
+        if data.Flags & JumpLib.Flags.DISABLE_MOVING_INPUT ~= 0 then
+            if JumpLib.Internal.MOVE_ACTIONS[action] then
+                return JumpLib.Internal.HOOK_TO_CANCEL[hook]
+            end
+        end
+        if data.Flags & JumpLib.Flags.DISABLE_PILL_CARD_INPUT ~= 0 then
+            if action == ButtonAction.ACTION_PILLCARD then
+                return JumpLib.Internal.HOOK_TO_CANCEL[hook]
+            end
+        end
+        if data.Flags & JumpLib.Flags.DISABLE_ACTIVE_ITEM_INPUT ~= 0 then
+            if action == ButtonAction.ACTION_ITEM then
+                return JumpLib.Internal.HOOK_TO_CANCEL[hook]
+            end
+        end        
     end)
 
     ---@param entity Entity
