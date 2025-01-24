@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.3.7
+    Version 1.3.6
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
