@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.3.5
+    Version 1.3.7
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -59,7 +59,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 15
+    local LOCAL_VERSION = 17
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -363,6 +363,11 @@ function LOCAL_JUMPLIB.Init()
         GRID_PLAYER_SEARCH_RADIUS = 50,
         ---Non-REPENTOGON
         PLAYER_POSITION_OFFSET_MULT = 1.5,
+        WATCHSTATE_TO_TIMESCALE = {
+            [0] = 1,
+            [1] = 0.8,
+            [2] = 1.43
+        }
     }
 
     ---@param callback ModCallbacks | JumpCallback
@@ -941,10 +946,12 @@ function LOCAL_JUMPLIB.Init()
                 JumpLib:RunCallbackWithParam(JumpLib.Callbacks.ENTITY_UPDATE_30, player or entity, jumpData)
             end
 
-            entityData.Fallspeed = entityData.Fallspeed + JumpLib.Constants.FALLSPEED_INCR * entityData.StaticJumpSpeed
+            local timescale = JumpLib.Internal.WATCHSTATE_TO_TIMESCALE[game:GetRoom():GetBrokenWatchState() or 0]
+
+            entityData.Fallspeed = entityData.Fallspeed + (JumpLib.Constants.FALLSPEED_INCR * entityData.StaticJumpSpeed) * timescale
 
             entityData.Height = math.max(0,
-                entityData.Height + entityData.StaticHeightIncrease - entityData.Fallspeed * entityData.StaticJumpSpeed
+                entityData.Height + (entityData.StaticHeightIncrease - entityData.Fallspeed * entityData.StaticJumpSpeed) * timescale
             )
 
             if not REPENTOGON and not player then
@@ -1055,6 +1062,13 @@ function LOCAL_JUMPLIB.Init()
 
         if player:GetSprite():IsFinished("FallIn") then
             player.SpriteScale = JumpLib.Internal.Vector.Zero
+        end
+    end)
+
+    AddCallback(ModCallbacks.MC_POST_NEW_ROOM, function ()
+        for i = 0, game:GetNumPlayers() - 1 do
+            local player = Isaac.GetPlayer(i)
+            JumpLib.Internal:GetData(player).JumpPos = player.Position
         end
     end)
 
