@@ -12,7 +12,22 @@ JumpLib is a code library for The Binding of Isaac: Repentance(+) that enables e
 - 11 custom callbacks
 - Customizable familiar, knife, and laser parent jump follow behavior
 - Tag system for attaching identifiers to jumps to track their sources
-- Configurable bomb behavior, allowing for dropping bombs mid-air
+
+# Uses
+
+| Z-Positioning  | Simple Jump Mechanics |
+| ------------- | ------------- |
+| ![grubshowcase-2-ezgif com-video-to-gif-converter](https://github.com/user-attachments/assets/c8fa8290-2679-4c89-8edb-209e7e02602c) | ![2024-09-02_22-01-26-2-1online-video-cutter com-ezgif com-video-to-gif-converter(1)](https://github.com/user-attachments/assets/b8a98896-8f5f-431e-9cfe-9819eb32962f) |
+
+| Custom Projectiles + Visual Effects  | Haha they jump when they spawn its awesome |
+| ------------- | ------------- |
+| ![2025-02-1723-58-22-ezgif com-video-to-gif-converter(1)](https://github.com/user-attachments/assets/a8c32046-bcdb-450c-adae-4d2250f8d4bb) | ![2025-02-1723-53-05-ezgif com-video-to-gif-converter(1)](https://github.com/user-attachments/assets/7619f1f1-1aed-4b98-8709-eab52a173e7c) |
+
+# his is D!Edith
+
+| Hello this is d!edith |
+| ------------- |
+| [![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/M675FUUZiJ8/0.jpg)](https://www.youtube.com/watch?v=M675FUUZiJ8) |
 
 # Links
 - [Documentation](https://kerkeland.gitbook.io/jumplib)
