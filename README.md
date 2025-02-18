@@ -23,12 +23,6 @@ JumpLib is a code library for The Binding of Isaac: Repentance(+) that enables e
 | ------------- | ------------- |
 | ![2025-02-1723-58-22-ezgif com-video-to-gif-converter(1)](https://github.com/user-attachments/assets/a8c32046-bcdb-450c-adae-4d2250f8d4bb) | ![2025-02-1723-53-05-ezgif com-video-to-gif-converter(1)](https://github.com/user-attachments/assets/7619f1f1-1aed-4b98-8709-eab52a173e7c) |
 
-# his is D!Edith
-
-| Hello this is d!edith |
-| ------------- |
-| [![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/M675FUUZiJ8/0.jpg)](https://www.youtube.com/watch?v=M675FUUZiJ8) |
-
 # Links
 - [Documentation](https://kerkeland.gitbook.io/jumplib)
 - [Modding of Isaac resource post](https://discord.com/channels/962027940131008653/1260026241386287255)
