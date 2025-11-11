@@ -921,10 +921,8 @@ function LOCAL_JUMPLIB.Init()
     ---@param entity Entity
     function JumpLib:IsFalling(entity)
         local data = JumpLib.Internal:GetData(entity)
-        if (data.Fallspeed or 0) > (data.StaticHeightIncrease or 1) then
-            return true
-        end
-        return false
+        local speedFormula = (data.Fallspeed or 0) * (data.StaticJumpSpeed or 0)
+        return (speedFormula) > (data.StaticHeightIncrease or 1)
     end
 
     ---@param entity Entity
