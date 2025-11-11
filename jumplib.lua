@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.3.6
+    Version 1.3.7
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -59,7 +59,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 17
+    local LOCAL_VERSION = 18
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -1290,3 +1290,4 @@ end
 return LOCAL_JUMPLIB
 
 -- Special thanks to Thicco Catto
+
