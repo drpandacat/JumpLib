@@ -1,6 +1,6 @@
 --[[
     Jump Library by Kerkel
-    Version 1.3.7
+    Version 1.3.8
     Direct issues and requests to the dedicated resources post in https://discord.gg/modding-of-isaac-962027940131008653
     GitHub repository: https://github.com/drpandacat/JumpLib/
     GitBook documentation: https://kerkeland.gitbook.io/jumplib
@@ -59,7 +59,7 @@
 local LOCAL_JUMPLIB = {}
 
 function LOCAL_JUMPLIB.Init()
-    local LOCAL_VERSION = 18
+    local LOCAL_VERSION = 19
 
     if JumpLib then
         if JumpLib.Version > LOCAL_VERSION then
@@ -686,11 +686,13 @@ function LOCAL_JUMPLIB.Init()
 
             for i, v in ipairs(Isaac.FindByType(EntityType.ENTITY_FAMILIAR)) do
                 local familiar = v:ToFamiliar() ---@cast familiar EntityFamiliar
-                local orbital = (orbitals and JumpLib.Internal:IsOrbital(familiar))
+                if GetPtrHash(familiar.Player) == hash then
+                    local orbital = (orbitals and JumpLib.Internal:IsOrbital(familiar))
 
-                if orbital or (followers and (JumpLib.Internal:IsFollower(familiar) or familiar.Variant == FamiliarVariant.BLOOD_BABY)) or (tearcopying and JumpLib.Internal.TEAR_COPYING_FAMILIARS[familiar.Variant] and familiar.Variant ~= FamiliarVariant.SPRINKLER) then
-                    local _config = config if orbital then _config.Flags = _config.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS end
-                    JumpLib:Jump(v, _config, force)
+                    if orbital or (followers and (JumpLib.Internal:IsFollower(familiar) or familiar.Variant == FamiliarVariant.BLOOD_BABY)) or (tearcopying and JumpLib.Internal.TEAR_COPYING_FAMILIARS[familiar.Variant] and familiar.Variant ~= FamiliarVariant.SPRINKLER) then
+                        local _config = config if orbital then _config.Flags = _config.Flags | JumpLib.Flags.GRIDCOLL_NO_WALLS end
+                        JumpLib:Jump(v, _config, force)
+                    end
                 end
             end
         end
@@ -1290,4 +1292,3 @@ end
 return LOCAL_JUMPLIB
 
 -- Special thanks to Thicco Catto
-
